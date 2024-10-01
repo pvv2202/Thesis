@@ -2,6 +2,7 @@ import keras
 from keras.datasets import mnist
 from keras.utils import to_categorical
 import Interpreter
+import gp
 
 if __name__ == '__main__':
     # Load data (example with the MNIST dataset)
@@ -19,36 +20,40 @@ if __name__ == '__main__':
     y_train = keras.utils.to_categorical(y_train, 10)
     y_test = keras.utils.to_categorical(y_test, 10)
 
-    # Initialize the PushInterpreter
-    interpreter = Interpreter.PushInterpreter(X_train, y_train, X_test, y_test)
+    population = gp.Population()
+    population.initialize_population()
+    population.run(X_train, y_train, X_test, y_test)
 
-    # Add code
-    interpreter.exec_stack.extend([
-        interpreter.input_layer,
-        interpreter.conv,
-        interpreter.conv,
-        interpreter.max_pool,
-        interpreter.normalize,
-        interpreter.conv,
-        interpreter.max_pool,
-        interpreter.normalize,
-        interpreter.global_pool,
-        interpreter.output_layer,
-        interpreter.compile,
-        interpreter.fit
-    ])
-
-    # Add ints
-    interpreter.int_stack.extend([
-    ])
-
-    # Add strings
-    interpreter.str_stack.extend([
-        'relu',
-        'relu',
-        'relu',
-        'relu',
-    ])
-
-    interpreter.run()
+    # # Initialize the PushInterpreter
+    # interpreter = Interpreter.PushInterpreter(X_train, y_train, X_test, y_test)
+    #
+    # # Add code
+    # interpreter.exec_stack.extend([
+    #     interpreter.input_layer,
+    #     interpreter.conv,
+    #     interpreter.conv,
+    #     interpreter.max_pool,
+    #     interpreter.normalize,
+    #     interpreter.conv,
+    #     interpreter.max_pool,
+    #     interpreter.normalize,
+    #     interpreter.global_pool,
+    #     interpreter.output_layer,
+    #     interpreter.compile,
+    #     interpreter.fit
+    # ])
+    #
+    # # Add ints
+    # interpreter.int_stack.extend([
+    # ])
+    #
+    # # Add strings
+    # interpreter.str_stack.extend([
+    #     'relu',
+    #     'relu',
+    #     'relu',
+    #     'relu',
+    # ])
+    #
+    # interpreter.run()
 
