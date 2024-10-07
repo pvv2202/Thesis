@@ -27,6 +27,10 @@ class Interpreter:
             'relu': self.tensor_relu,
             'matmul': self.tensor_matmul,
             'sigmoid': self.tensor_sigmoid,
+            'normalize': self.tensor_normalize,
+            'convolve': self.tensor_convolve,
+            'flatten': self.tensor_flatten,
+            'fit': self.fit
         }
 
         """Dense layer would be like 1x5 x 5x4 to get 1x4. Attention is obviously all matrix mult.
@@ -38,17 +42,62 @@ class Interpreter:
     Tensor Operations
     '''
 
+    #TODO: For GP, we probably want to have our functions be kind of "smart" i.e. if we specify adding a matmul or something, ensuring that we add a tensor that can handle that? Or just whenever we add a tensor we add one that is compatible with the previous one?
     def tensor_matmul(self):
-        '''Performs a matrix multiplication on the top two tensors on the stack'''
+        '''
+        Performs a matrix multiplication on the top two tensors on the stack. Pytorch's matmul function
+        automatically supports broadcasting (i.e. multiplying tensors of different sizes for batch/channel dimensions)
+        '''
         if len(self.tensor_stack) >= 2:
             a = self.tensor_stack.pop()
             b = self.tensor_stack.pop()
 
-            # Check if the dimensions are compatible. If not, noop
+            # Check if sizes are compatible. If not, just return
             if a.size()[-1] != b.size()[-2]:
                 return
 
             result = torch.matmul(a, b)
+            self.tensor_stack.append(result)
+
+    def tensor_convolve(self):
+        '''
+        Performs a convolution on the top two tensors on the stack
+        Here this is defined as multiplying along rows and columns as much as it can.
+        '''
+        if len(self.tensor_stack) >= 2:
+            a = self.tensor_stack.pop()
+            b = self.tensor_stack.pop() # b will be the kernel
+
+            # If either is 1-dimensional, do nothing
+            if a.dim() == 1 or b.dim() == 1:
+                return #TODO: Think harder about this. Would there ever be an advantage to projecting a 1D tensor to a 2D tensor and convolving? Maybe include the option and see?
+
+            if a.dim() == 2:
+                a = a.unsqueeze(0).unsqueeze(0)  # Shape: [1, 1, aH, aW]
+            elif a.dim() == 3:
+                a = a.unsqueeze(0)  # Shape: [1, C, aH, aW]
+
+            if b.dim() == 2:
+                b = b.unsqueeze(0).unsqueeze(0)  # Shape: [1, 1, bH, bW]
+                b = b.expand(a.size(1), a.size(1), -1, -1)  # Shape: [C_in, C_in, bH, bW]
+            elif b.dim() == 3:
+                b = b.unsqueeze(1)  # Shape: [C_out, 1, bH, bW]
+                b = b.expand(-1, a.size(1), -1, -1)  # Shape: [C_out, C_in, bH, bW]
+
+            # Calculate padding to achieve 'same' convolution (output size matches input size)
+            bH, bW = b.size(2), b.size(3)
+            padding = (bH // 2, bW // 2)
+
+            # Perform convolution
+            result = torch.nn.functional.conv2d(a, b, padding=padding)
+
+            self.tensor_stack.append(result)
+
+    def tensor_normalize(self):
+        '''Normalizes the top tensor on the stack'''
+        if len(self.tensor_stack) >= 1:
+            a = self.tensor_stack.pop()
+            result = torch.nn.functional.normalize(a)
             self.tensor_stack.append(result)
 
     def tensor_add(self):
@@ -79,6 +128,13 @@ class Interpreter:
         if len(self.tensor_stack) >= 1:
             a = self.tensor_stack.pop()
             result = torch.sigmoid(a)
+            self.tensor_stack.append(result)
+
+    def tensor_flatten(self):
+        '''Flattens the top tensor on the stack'''
+        if len(self.tensor_stack) >= 1:
+            a = self.tensor_stack.pop()
+            result = torch.flatten(a)
             self.tensor_stack.append(result)
 
     '''NN Operations'''
