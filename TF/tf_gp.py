@@ -1,4 +1,4 @@
-import Interpreter
+import tf_interpreter
 import random
 
 INT_RANGE = (1, 112)
@@ -24,9 +24,9 @@ class Genome():
             case 1:
                 self.genes.insert(index, random.uniform(*FLOAT_RANGE))
             case 2:
-                self.genes.insert(index, random.choice(Interpreter.valid_instruction_mutations))
+                self.genes.insert(index, random.choice(tf_interpreter.valid_instruction_mutations))
             case 3:
-                self.genes.insert(index, random.choice(Interpreter.valid_activation_mutations))
+                self.genes.insert(index, random.choice(tf_interpreter.valid_activation_mutations))
 
     def remove_gene(self):
         '''Removes a gene'''
@@ -54,13 +54,13 @@ class Genome():
             case 1:
                 self.genes[index] = random.uniform(*FLOAT_RANGE)
             case 2:
-                self.genes[index] = random.choice(Interpreter.valid_instruction_mutations)
+                self.genes[index] = random.choice(tf_interpreter.valid_instruction_mutations)
             case 3:
-                self.genes[index] = random.choice(Interpreter.valid_activation_mutations)
+                self.genes[index] = random.choice(tf_interpreter.valid_activation_mutations)
 
     def transcribe(self, X_train, y_train, X_test, y_test):
         '''Transcribes the genome'''
-        interpreter = Interpreter.PushInterpreter(X_train, y_train, X_test, y_test)
+        interpreter = tf_interpreter.TFInterpreter(X_train, y_train, X_test, y_test)
         interpreter.read_genome(self.genes)
         score = interpreter.run()
         self.fitness = score[0]
@@ -89,7 +89,7 @@ class Population():
         self.population[-3:] = self.population[:3]
 
         # Mutate the rest. Add a gene with 35% probability, remove a gene with 15% probability, mutate a gene with 50% probability
-        for genome in self.population:
+        for genome in self.population[1:]:
             rand = random.random()
             num = random.randint(1, 3)
             if rand < 0.35:
