@@ -1,8 +1,8 @@
 import keras
 from keras.datasets import mnist
 from keras.utils import to_categorical
-import Interpreter
-import gp
+import tf_interpreter
+import tf_gp
 
 if __name__ == '__main__':
     # Load data (example with the MNIST dataset)
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     y_train = keras.utils.to_categorical(y_train, 10)
     y_test = keras.utils.to_categorical(y_test, 10)
 
-    population = gp.Population()
+    population = tf_gp.Population()
     population.initialize_population()
     population.run(X_train, y_train, X_test, y_test)
 
