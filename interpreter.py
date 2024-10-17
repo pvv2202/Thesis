@@ -1,4 +1,4 @@
-from Instructions.instructions import Instructions
+from instructions import Instructions
 from network import Network
 
 class Interpreter:
