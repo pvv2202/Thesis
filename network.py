@@ -1,15 +1,18 @@
 import torch
 import torch.nn as nn
-from Instructions.instructions import Instructions
+from instructions import Instructions
 import torch.nn.functional as F
 import copy
-from utils import get_dim_size
+from utils import get_dim_size, broadcastable
+
+# TODO: Something is going on with the popping params thing. Need to fix this.
 
 class Network(nn.Module):
     '''Class For Neural Network'''
     def __init__(self, stacks, train, test):
         super(Network, self).__init__()
         self.stacks = stacks
+        self.network = copy.deepcopy(stacks)
         self.weights = stacks['params']
         self.train = train
         self.test = test
@@ -22,38 +25,47 @@ class Network(nn.Module):
         # Initialize instructions
         self.instructions = Instructions()
 
-    def output_layer(self, mode='create'):
+    def output_layer(self, create=True):
         '''
         Adds the weights that will project whatever the current last tensor is
         to the output dimensions. For now this just runs softmax, but could be
         adapted to support other things.
         '''
-        if len(self.stack['tensor']) >= 1:
+
+        if len(self.stacks['tensor']) >= 1:
+
+            if create:
+                print(self.stacks['params'])
             # Pop a, get dimension
-            a = self.stack['tensor'].pop()
+            a = self.stacks['tensor'].pop()
+
+            # Get dimension of a
+            a_dim = get_dim_size(a, 1)  # Index -1
 
             # If a is greater than 2D, flatten it so projection to output shape works as desired
             # TODO: There are potential issues here with respect to batching. The real potential for error is batched 1D inputs
             # TODO: For something like that we'll probably run into a bunch of problems anyway. Need to think about this
-            if a.dim() > 2:
-                a = torch.flatten(a, start_dim=1)
+            if a_dim > 2:
+                a = torch.flatten(a, start_dim=0, end_dim=-1)
+                a_dim = get_dim_size(a, 1)
 
-            # Get dimension of a
-            a_dim = get_dim_size(a, 1) # Index -1
-
-            if mode == 'create':
+            weights = None
+            if create:
                 # Create weights
                 weights = torch.randn(a_dim, self.output_shape, requires_grad=True)
-                self.stack['params'].append(weights)
-            elif mode == 'weights':
+                self.stacks['params'].append(weights)
+            elif len(self.stacks['params']) >= 1:
                 # Get weights
-                weights = self.stack['params'].pop()
+                weights = self.stacks['params'].pop(0)
 
-            # Multiply a by weights and return. Should now have dimension of output_shape
-            return torch.matmul(a, weights)
+            # Multiply a by weights and add to tensor stack. Should now have dimension of output_shape
+            if weights is not None:
+                if broadcastable(a, weights):
+                    self.stacks['tensor'].append(torch.matmul(a, weights))
 
-    def forward(self, x, mode='create'):
+    def forward(self, x, create=True):
         '''Forward Pass'''
+        self.stacks = copy.deepcopy(self.network)
         # Maintain a count of pushed tensors. This is for the input logic. Maybe would be smart to remove this?
         push_tensor_count = sum([1 for instruction in self.stacks['exec'] if instruction == 'push_tensor'])
         pushed_tensors = 0
@@ -67,26 +79,29 @@ class Network(nn.Module):
             if instruction == 'push_tensor':
                 # If this is the last tensor we're going to push, make it compatible with input
                 if pushed_tensors == push_tensor_count-1:
-                    self.instructions(self.stacks, instruction, mode='input', input_shape=self.input_shape)
+                    self.instructions(self.stacks, instruction, create=create, input=True, input_dim=self.input_shape)
                 # Otherwise, just push the tensor as normal
                 else:
-                    self.instructions(self.stacks, instruction, mode=mode)
+                    self.instructions(self.stacks, instruction, create=create)
             # If not pushing a tensor, just execute the instruction
             elif instruction in self.instructions.instructions:
                 self.instructions(self.stacks, instruction)
 
         # Run the output layer
-        self.output_layer(mode)
+        self.output_layer(create)
 
-        if mode == 'create':
+        if create:
             # Set weights to be params
             self.weights = copy.deepcopy(self.stacks['params'])
-        elif mode == 'weights':
+        else:
             # Reset params to original state (copying weights)
             self.stacks['params'] = copy.deepcopy(self.weights)
 
         # Return final tensor on the stack as output
-        return self.stacks['tensor'][-1]
+        if len(self.stacks['tensor']) >= 1:
+            return self.stacks['tensor'][-1]
+        else:
+            return None
 
     def compute_loss(self, output_tensor, batch_labels, loss_function='cross_entropy'):
         '''Compute the loss with respect to the target'''
@@ -98,9 +113,12 @@ class Network(nn.Module):
 
         return loss
 
-    def fit(self, epochs=3, optimizer_name='adam', loss='cross_entropy', learning_rate=0.01):
+    def fit(self, epochs=3, optimizer_name='adam', loss_function='cross_entropy', learning_rate=0.01):
         '''Fit the network'''
-        # Choose optimizer
+        # Run forward pass once to create the weights
+        self.forward(next(iter(self.train))[0], create=True)
+
+        # Choose optimizer. Give it params so it knows which weights to update
         if optimizer_name == 'adam':
             optimizer = torch.optim.Adam(self.stacks['params'], lr=learning_rate)
         elif optimizer_name == 'sgd':
@@ -112,31 +130,31 @@ class Network(nn.Module):
         for epoch in range(epochs):
             # Training loop
             total_loss = 0.0  # Accumulate loss over the epoch
-            for batch_num, batch_inputs, batch_labels in enumerate(self.train):
+            for batch_inputs, batch_labels in enumerate(self.train):
                 optimizer.zero_grad()  # Reset gradients
 
-                # Forward pass: use batch tensors as input to the model
-                if epoch == 0 and batch_num == 0:
-                    # If on the very first pass, we need to create the weights for the first time
-                    output_tensor = self.forward(batch_inputs, mode='create')
-                else:
-                    # If weights have been created, we can just use them
-                    output_tensor = self.forward(batch_inputs, mode='weights')
+                output_tensor = self.forward(batch_inputs, create=False)
 
-                # TODO: I think it's possible for the output tensor to have an incorrect shape
+                # Skip if things didn't work
+                if output_tensor is None:
+                    continue
+
+                # TODO: I think it's possible for the output tensor to have an incorrect shape. Or is it? 2d x 2d should preserve batch
+                # TODO: dimension even for 1d tensors
 
                 # Compute loss with respect to the target (batch_labels)
-                loss = self.compute_loss(output_tensor, batch_labels)
+                loss = self.compute_loss(output_tensor, batch_labels, loss_function=loss_function)
 
-                # Backpropagation
+                # Backpropagation (compute gradients for each tensor in parameters w.r.t loss). PyTorch's autograd constructs and
+                # Maintains the computation graph
                 loss.backward()
 
-                # Update parameters
+                # Update parameters (just adds the gradients for each weight to the respective weights)
                 optimizer.step()
 
                 total_loss += loss.item() * batch_inputs.size(0)  # Multiply by batch size
 
-            average_loss = total_loss / len(self.train.dataset)
+            average_loss = total_loss / len(self.train.dataset) # Average loss across all batches
             print(f"Epoch {epoch + 1}, Loss: {average_loss:.4f}")
 
             return average_loss

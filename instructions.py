@@ -1,22 +1,23 @@
 import torch
 import torch.nn as nn
-from instructions import Instructions
 from utils import broadcastable, get_dim_size
 
-class TensorInstructions(Instructions):
-    '''Tensor Instruction Class'''
+class Instructions:
+    '''Instruction Class'''
     def __init__(self):
-        super().__init__()
+        '''Initialize Instructions'''
+        self.instructions  = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__")]
 
-    def __call__(self, stack, instruction):
-        if hasattr(self, instruction):
-            return getattr(self, instruction)(stack)
-        else:
-            raise AttributeError(f"TensorInstruction does not have {instruction} method")
+    def __call__(self, stack, instruction, *args, **kwargs):
+        '''Call instruction on state'''
+        # Access the static method from the class, not the instance
+        method = getattr(self.__class__, instruction)
+        return method(stack, *args, **kwargs)
 
-    '''
-    Misc Operations
-    '''
+    #######################
+    # Tensor Instructions #
+    #######################
+
     @staticmethod
     def add_previous_dim(stack):
         '''Adds the previous layer's last dimension to the int stack'''
@@ -29,25 +30,23 @@ class TensorInstructions(Instructions):
     '''
     @staticmethod
     # TODO: Might not want to force input. This doesn't allow for convolution really
-    def push_tensor(stack, mode='create', input_dim=None):
+    # TODO: Need to rethink modes. The input mode will always be called which is bad. Need to separate them out into 2 bools
+    def push_tensor(stack, create=True, input_dim=None, input=False):
         '''Adds a tensor to the stack'''
         # If tensor stack is empty, do nothing
         if len(stack['tensor']) > 0:
-            # If mode is weights, use weights from params
-            if mode == 'weights':
-                stack['tensor'].append(stack['params'].pop())
-            # If mode is input, create a new tensor using input dimension
-            elif mode == 'input':
-                # If input_dim is not None, we want to add a tensor whose second to last dimension is compatible
-                # with input_dim's last dimension
-                if input_dim:
+            if create and len(stack['int']) >= 1:
+                if input and input_dim:
+                    # Add tensor to be compatible with input data
                     stack['tensor'].append(torch.randn(input_dim, stack['int'].pop(), requires_grad=True))
-            # If mode is create, create a new tensor using previous tensor's last dimension
-            elif mode == 'create':
-                # Get second to last dimension
-                dim = get_dim_size(stack['tensor'][-1], 2)
-                stack['tensor'].append(torch.randn(stack['int'].pop(), dim, requires_grad=True)) # Use previous layer to be compatible
-                stack['params'].append(stack['tensor'][-1])
+                else:
+                    # Get second to last dimension
+                    dim = get_dim_size(stack['tensor'][-1], 2)
+                    stack['tensor'].append(torch.randn(stack['int'].pop(), dim, requires_grad=True))  # Use previous layer to be compatible
+                    stack['params'].append(stack['tensor'][-1])
+            elif len(stack['params']) >= 1:
+                # If we've already created weights, just use them. Should be in order in which they were created in params
+                stack['tensor'].append(stack['params'].pop(0))
 
     @staticmethod
     def duplicate_tensor(stack):
@@ -89,7 +88,7 @@ class TensorInstructions(Instructions):
     @staticmethod
     def tensor_matmul_duplicate(stack):
         '''Performs a matrix multiplication on the top tensor on the stack but duplicates a'''
-        if len(stack['tensor']) >= 1:
+        if len(stack['tensor']) >= 2:
             # Check if sizes are compatible. If not, just return
             if get_dim_size(stack['tensor'][-1], 1) != get_dim_size(stack['tensor'][-2], 2):
                 return
@@ -102,7 +101,7 @@ class TensorInstructions(Instructions):
             stack['tensor'].append(a)
 
     @staticmethod
-    def tensor_max_pool(self, stack):
+    def tensor_max_pool(stack):
         '''Performs a pooling operation on the top tensor on the stack'''
         if len(stack['tensor']) >= 1:
             # If 1-dimensional, do nothing
@@ -239,3 +238,76 @@ class TensorInstructions(Instructions):
 
             result = tensor / divisor
             stack['tensor'].append(result)
+
+    ####################
+    # Int Instructions #
+    ####################
+
+    @staticmethod
+    def int_add(stack):
+        '''Adds two integers'''
+        if len(stack['int']) >= 2:
+            a = stack['int'].pop()
+            b = stack['int'].pop()
+            stack['int'].append(a + b)
+
+    @staticmethod
+    def int_mult(stack):
+        '''Multiplies two integers'''
+        if len(stack['int']) >= 2:
+            a = stack['int'].pop()
+            b = stack['int'].pop()
+            stack['int'].append(a * b)
+
+    @staticmethod
+    def int_divide(stack):
+        '''Divides two integers'''
+        if len(stack['int']) >= 2:
+            a = stack['int'].pop()
+            b = stack['int'].pop()
+            stack['int'].append(a // b)
+
+    @staticmethod
+    def int_sqrt(stack):
+        '''Takes the square root of an integer'''
+        if len(stack['int']) >= 1:
+            a = stack['int'].pop()
+            stack['int'].append(a ** 0.5)
+
+    ######################
+    # Float Instructions #
+    ######################
+
+    @staticmethod
+    def float_add(stack):
+        '''Adds two floats'''
+        if len(stack['float']) >= 2:
+            a = stack['float'].pop()
+            b = stack['float'].pop()
+            stack['float'].append(a + b)
+
+    @staticmethod
+    def float_mult(stack):
+        '''Multiplies two floats'''
+        if len(stack['float']) >= 2:
+            a = stack['float'].pop()
+            b = stack['float'].pop()
+            stack['float'].append(a * b)
+
+    @staticmethod
+    def float_divide(stack):
+        # TODO: Might need to be careful here so we don't get enormous values dividing by something
+        '''Divides two floats'''
+        if len(stack['float']) >= 2:
+            # Check so we don't divide by zero
+            if stack['float'][-1] != 0:
+                a = stack['float'].pop()
+                b = stack['float'].pop()
+                stack['float'].append(a // b)
+
+    @staticmethod
+    def float_sqrt(stack):
+        '''Takes the square root of a floats'''
+        if len(stack['float']) >= 1:
+            a = stack['float'].pop()
+            stack['float'].append(a ** 0.5)

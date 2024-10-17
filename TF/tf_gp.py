@@ -110,5 +110,5 @@ class Population():
                 genome.transcribe(X_train, y_train, X_test, y_test)
             self.forward_generation()
             print(self.population[0].fitness)
-            print(self.population[0].genes)
+            print(self.population[0].genome)
             print()
