@@ -12,12 +12,16 @@ if __name__ == '__main__':
     # Load MNIST dataset
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
     train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True)
 
     unique_labels = torch.unique(train_dataset.targets)
     train_features, train_labels = next(iter(train_loader))
 
-    pop = Population(10, 10)
-    pop.run(10, train_loader, train_loader)
+    # genome = Genome()
+    # genome.genome = [torch.randn(784, 10, requires_grad=True), 'squeeze_tensor', 'tensor_matmul', 'tensor_flatten']
+    # network = genome.transcribe(train_loader, train_loader)
+    # network.fit()
+    pop = Population(1000, 20)
+    pop.run(1000, train_loader, train_loader)
 
 
