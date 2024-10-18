@@ -1,3 +1,5 @@
+import copy
+import torch
 from instructions import Instructions
 from network import Network
 
@@ -13,7 +15,7 @@ class Interpreter:
             'tensor': [],
             'exec': [],
 
-            'params': [] # Parameter stack for optimization
+            'params': [], # Parameter stack for optimization
         }
 
         # Initialize instructions
@@ -22,22 +24,26 @@ class Interpreter:
     # TODO: Need to run the program and then use params as push_tensor. They are added in order, so we should be able to use them in order
     # TODO: Could just replace push_tensor with a modified version that takes them from params
     def read_genome(self, genome):
-        '''Reads the genome, processes it into stacks, and creates a network'''
+        '''Reads the genome and processes it into stacks'''
         # Process genome into stacks
-        for instruction in genome:
-            if type(instruction) == int:
-                self.stacks['int'].append(instruction)
-            elif type(instruction) == float:
-                self.stacks['float'].append(instruction)
-            elif type(instruction) == bool:
-                self.stacks['bool'].append(instruction)
-            elif instruction in self.instructions.instructions:
-                self.stacks['exec'].append(instruction)
-            elif type(instruction) == str:
-                self.stacks['str'].append(instruction)
+        for gene in genome:
+            if type(gene) == int:
+                self.stacks['int'].append(gene)
+            elif type(gene) == float:
+                self.stacks['float'].append(gene)
+            elif type(gene) == bool:
+                self.stacks['bool'].append(gene)
+            elif type(gene) == torch.Tensor:
+                self.stacks['tensor'].append(gene)
+                self.stacks['params'].append(gene)
+            elif gene in self.instructions.instructions:
+                self.stacks['exec'].append(gene)
+            elif type(gene) == str:
+                self.stacks['str'].append(gene)
 
     def create_network(self, train, test):
-        '''Creates a network and accepts train/test data to shape the input/output accordingly'''
-        return Network(self.stacks, train, test)
+        '''Creates a network from the stacks'''
+        stack_copy = copy.deepcopy(self.stacks)
+        return Network(stack_copy, train, test)
 
     # TODO: Add create_network function that creates a network and accepts train/test data to shape the input/output accordingly

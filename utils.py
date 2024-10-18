@@ -27,9 +27,11 @@ def get_dim_size(tensor, i):
     If the tensor is 1D, it just returns the size. PyTorch automatically treats 1D tensors as column or row vectors
     depending on order, so for b = (d) and a = (a, d), a * b = (a, d) * (d, 1) = (a)
     '''
-
+    # If we somehow have a scalar tensor, just return 1
+    if tensor.dim() == 0:
+        return 1
     # If the tensor is 1 dimensional we just return the size
-    if tensor.dim() == 1:
+    elif tensor.dim() == 1:
         return tensor.size()[0]
     # Otherwise return specified index
     else:

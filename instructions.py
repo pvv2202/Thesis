@@ -28,25 +28,39 @@ class Instructions:
     '''
     Tensor Stack Operations
     '''
-    @staticmethod
-    # TODO: Might not want to force input. This doesn't allow for convolution really
-    # TODO: Need to rethink modes. The input mode will always be called which is bad. Need to separate them out into 2 bools
-    def push_tensor(stack, create=True, input_dim=None, input=False):
-        '''Adds a tensor to the stack'''
-        # If tensor stack is empty, do nothing
-        if len(stack['tensor']) > 0:
-            if create and len(stack['int']) >= 1:
-                if input and input_dim:
-                    # Add tensor to be compatible with input data
-                    stack['tensor'].append(torch.randn(input_dim, stack['int'].pop(), requires_grad=True))
-                else:
-                    # Get second to last dimension
-                    dim = get_dim_size(stack['tensor'][-1], 2)
-                    stack['tensor'].append(torch.randn(stack['int'].pop(), dim, requires_grad=True))  # Use previous layer to be compatible
-                    stack['params'].append(stack['tensor'][-1])
-            elif len(stack['params']) >= 1:
-                # If we've already created weights, just use them. Should be in order in which they were created in params
-                stack['tensor'].append(stack['params'].pop(0))
+    # @staticmethod
+    # # TODO: Might not want to force input. This doesn't allow for convolution really
+    # # TODO: Need to rethink modes. The input mode will always be called which is bad. Need to separate them out into 2 bools
+    # def push_tensor(stack, create=False):
+    #     '''
+    #     Adds a tensor to the stack. For now always 2D. At first, we create random weights.
+    #     For future passes, we need to use the same tensors so we use the params stack
+    #     '''
+    #     if len(stack['int']) >= 2:
+    #         dim1 = stack['int'].pop()
+    #         dim2 = stack['int'].pop()
+    #         if create:
+    #             stack['tensor'].append(torch.randn(dim1, dim2, requires_grad=True))
+    #             stack['params'].insert(0, stack['tensor'][-1]) # Insert at 0 so we can pop in order
+    #         else:
+    #             stack['tensor'].append(stack['params'].pop())
+
+    # def push_tensor(stack, create=True, input_dim=None, input=False):
+    #     '''Adds a tensor to the stack'''
+    #     # If tensor stack is empty, do nothing
+    #     if len(stack['tensor']) > 0:
+    #         if create and len(stack['int']) >= 1:
+    #             if input and input_dim:
+    #                 # Add tensor to be compatible with input data
+    #                 stack['tensor'].append(torch.randn(input_dim, stack['int'].pop(), requires_grad=True))
+    #             else:
+    #                 # Get second to last dimension
+    #                 dim = get_dim_size(stack['tensor'][-1], 2)
+    #                 stack['tensor'].append(torch.randn(stack['int'].pop(), dim, requires_grad=True))  # Use previous layer to be compatible
+    #                 stack['params'].append(stack['tensor'][-1])
+    #         elif len(stack['params']) >= 1:
+    #             # If we've already created weights, just use them. Should be in order in which they were created in params
+    #             stack['tensor'].append(stack['params'].pop(0))
 
     @staticmethod
     def duplicate_tensor(stack):
@@ -59,8 +73,17 @@ class Instructions:
     def transpose_tensor(stack):
         '''Transposes the top tensor on the stack'''
         if len(stack['tensor']) >= 1:
+            if stack['tensor'][-1].dim() > 1:
+                a = stack['tensor'].pop()
+                result = torch.transpose(a, 0, 1)
+                stack['tensor'].append(result)
+
+    @staticmethod
+    def squeeze_tensor(stack):
+        '''Squeezes the top tensor on the stack'''
+        if len(stack['tensor']) >= 1:
             a = stack['tensor'].pop()
-            result = torch.transpose(a, 0, 1)
+            result = torch.squeeze(a)
             stack['tensor'].append(result)
 
     '''
@@ -75,6 +98,9 @@ class Instructions:
         automatically supports broadcasting (i.e. multiplying tensors of different sizes for batch/channel dimensions)
         '''
         if len(stack['tensor']) >= 2:
+            # Make sure nothing is just a scalar
+            if stack['tensor'][-1].dim() < 1 or stack['tensor'][-2].dim() < 1:
+                return
             # Check if sizes are compatible. If not, just return
             if get_dim_size(stack['tensor'][-1], 1) != get_dim_size(stack['tensor'][-2], 2):
                 return
@@ -89,6 +115,9 @@ class Instructions:
     def tensor_matmul_duplicate(stack):
         '''Performs a matrix multiplication on the top tensor on the stack but duplicates a'''
         if len(stack['tensor']) >= 2:
+            # Make sure nothing is just a scalar
+            if stack['tensor'][-1].dim() < 1 or stack['tensor'][-2].dim() < 1:
+                return
             # Check if sizes are compatible. If not, just return
             if get_dim_size(stack['tensor'][-1], 1) != get_dim_size(stack['tensor'][-2], 2):
                 return
@@ -105,7 +134,7 @@ class Instructions:
         '''Performs a pooling operation on the top tensor on the stack'''
         if len(stack['tensor']) >= 1:
             # If 1-dimensional, do nothing
-            if stack['tensor'][-1].dim() == 1:
+            if stack['tensor'][-1].dim() <= 1:
                 return
 
             # Otherwise, pool
@@ -122,56 +151,62 @@ class Instructions:
                 kernel_size = stack['int'].pop()
                 stride = stack['int'].pop() # Don't need constraints on stride. If huge, we will just have 1x1 which should be weeded out via evolution anyway
                 if kernel_size < min(a.size(2), a.size(3)): # Only continue if kernel size is compatible (i.e. < height and width of input)
-                    result = nn.functional.max_pool2d(a, kernel_size=kernel_size, stride=stride)
+                    result = nn.functional.max_pool2d(a, kernel_size=(kernel_size, kernel_size), stride=stride)
                     stack['tensor'].append(result)
 
-    @staticmethod
-    def tensor_convolve(stack):
-        '''
-        Performs a convolution on the top two tensors on the stack Here this is defined as
-        multiplying along rows and columns as much as it can.
-        '''
-        if len(stack['tensor']) >= 2:
-            # TODO: Think harder about this. Would there ever be an advantage to projecting a 1D tensor to a 2D tensor and convolving? Maybe include the option and see?
-            # If either is 1-dimensional, do nothing
-            if stack['tensor'][-1].dim() == 1 or stack['tensor'][-2].dim() == 1:
-                return
-
-            a = stack['tensor'].pop()
-            b = stack['tensor'].pop() # b will be the kernel
-
-            # Adjust a's shape to be compatible with nn.functional.conv2d which expects 4D tensors (batch, channel, height, width)
-            if a.dim() == 2:
-                a = a.unsqueeze(0).unsqueeze(0)  # Shape: [1, 1, aH, aW]
-            elif a.dim() == 3:
-                a = a.unsqueeze(0)  # Shape: [1, channels, aH, aW]
-
-            # Adjust b's shape to be compatible with nn.functional.conv2d which expects 4D tensors (out_channels, in_channels, kernel_height, kernel_width)
-            # Here, out_channels determines how many channels will be in the output tensor. The rest are dimensions of the kernel
-            if b.dim() == 2:
-                b = b.unsqueeze(0).unsqueeze(0)  # Shape: [1, 1, bH, bW]
-                b = b.expand(a.size(1), a.size(1), -1, -1)  # Shape: [in_channels, in_channels, bH, bW]
-            elif b.dim() == 3:
-                b = b.unsqueeze(1)  # Shape: [C_out, 1, bH, bW]
-                b = b.expand(-1, a.size(1), -1, -1)  # Shape: [out_channels, in_channels, bH, bW]
-
-            # TODO: Have 2 separate functions, one that pads and one that doesn't?
-            # Calculate padding to achieve 'same' convolution (output size matches input size)
-            bH, bW = b.size(2), b.size(3)
-            padding = (bH // 2, bW // 2)
-
-            # Perform convolution
-            result = nn.functional.conv2d(a, b, padding=padding)
-
-            stack['tensor'].append(result)
+    # @staticmethod
+    # def tensor_convolve(stack):
+    #     '''
+    #     Performs a convolution on the top two tensors on the stack Here this is defined as
+    #     multiplying along rows and columns as much as it can.
+    #     '''
+    #     if len(stack['tensor']) >= 2:
+    #         # If either is 1-dimensional or b has more dimensions than a, do nothing
+    #         if stack['tensor'][-1].dim() == 1 or stack['tensor'][-2].dim() == 1 or stack['tensor'][-2].dim() > stack['tensor'][-1].dim():
+    #             return
+    #
+    #         a = stack['tensor'].pop()
+    #         b = stack['tensor'].pop() # b will be the kernel
+    #
+    #         # Extract the last two dimensions for convolution
+    #         a_spatial = a[..., :].contiguous()  # (rows, cols) of a
+    #         b_spatial = b[..., :].contiguous()  # (rows, cols) of b (kernel)
+    #
+    #         # Get the shapes of input and kernel
+    #         a_rows, a_cols = a_spatial.shape[-2:]
+    #         b_rows, b_cols = b_spatial.shape[-2:]
+    #
+    #         # Calculate the output shape after convolution with stride 1
+    #         out_rows = a_rows - b_rows + 1
+    #         out_cols = a_cols - b_cols + 1
+    #
+    #         # Initialize the output tensor
+    #         result = torch.zeros(*a.shape[:-2], out_rows, out_cols)
+    #
+    #         # Perform the convolution manually (sliding window)
+    #         for i in range(out_rows):
+    #             for j in range(out_cols):
+    #                 # Extract the sliding window from `a`
+    #                 window = a_spatial[..., i:i + b_rows, j:j + b_cols]
+    #
+    #                 # Element-wise multiplication and sum over the window
+    #                 conv_value = (window * b_spatial).sum(dim=(-2, -1))
+    #
+    #                 # Store the result
+    #                 result[..., i, j] = conv_value
+    #
+    #         # Push the resulting tensor back to the stack
+    #         stack['tensor'].append(result)
 
     @staticmethod
     def tensor_normalize(stack):
         '''Normalizes the top tensor on the stack'''
         if len(stack['tensor']) >= 1:
-            a = stack['tensor'].pop()
-            result = nn.functional.normalize(a)
-            stack['tensor'].append(result)
+            if stack['tensor'][-1].dim() >= 2:
+                a = stack['tensor'].pop()
+                result = nn.functional.normalize(a, dim=-1)
+
+                stack['tensor'].append(result)
 
     @staticmethod
     def tensor_add(stack):
@@ -225,9 +260,10 @@ class Instructions:
     def tensor_flatten(stack):
         '''Flattens the top tensor on the stack'''
         if len(stack['tensor']) >= 1:
-            a = stack['tensor'].pop()
-            result = torch.flatten(a)
-            stack['tensor'].append(result)
+            if stack['tensor'][-1].dim() > 1:
+                a = stack['tensor'].pop()
+                result = torch.flatten(a, start_dim=1)
+                stack['tensor'].append(result)
 
     @staticmethod
     def tensor_divide(stack):
@@ -265,14 +301,18 @@ class Instructions:
         if len(stack['int']) >= 2:
             a = stack['int'].pop()
             b = stack['int'].pop()
-            stack['int'].append(a // b)
+            if a // b > 0:
+                stack['int'].append(a // b)
 
     @staticmethod
     def int_sqrt(stack):
         '''Takes the square root of an integer'''
         if len(stack['int']) >= 1:
             a = stack['int'].pop()
-            stack['int'].append(a ** 0.5)
+            if type(a ** 0.5) == int:
+                stack['int'].append(a ** 0.5)
+            else:
+                stack['float'].append(a ** 0.5)
 
     ######################
     # Float Instructions #
@@ -300,7 +340,7 @@ class Instructions:
         '''Divides two floats'''
         if len(stack['float']) >= 2:
             # Check so we don't divide by zero
-            if stack['float'][-1] != 0:
+            if stack['float'][-2] != 0:
                 a = stack['float'].pop()
                 b = stack['float'].pop()
                 stack['float'].append(a // b)

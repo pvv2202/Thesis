@@ -1,22 +1,39 @@
 from interpreter import Interpreter
 from instructions import Instructions
+import torch
 import copy
 import random
 
-INT_RANGE = (1, 100)
+INT_RANGE = (1, 1000)
 FLOAT_RANGE = (0.0, 1.0)
+OUTPUT_SIZE = 10
+INPUT_SIZE = 28
+BATCH_SIZE = 64
 
 class Genome:
     '''Genome of a Push Program'''
     def __init__(self):
-        self.genome = ['push_tensor']
+        self.genome = []
         self.fitness = 0
         self.interpreter = Interpreter()
         self.instructions = Instructions()
 
+    def random_int(self):
+        '''Returns a random int'''
+        type = random.randint(0, 3)
+        match type:
+            case 0:
+                return random.randint(*INT_RANGE)
+            case 1:
+                return OUTPUT_SIZE
+            case 2:
+                return INPUT_SIZE
+            case 3:
+                return BATCH_SIZE
+
     def random_index(self):
         '''Returns a random index in the genome'''
-        return random.randint(0, len(self.genome)-1) # Always want to push at least 1 tensor
+        return random.randint(0, len(self.genome))
 
     def initialize_random(self, num_genes):
         '''Initializes the genome with random genes'''
@@ -28,15 +45,19 @@ class Genome:
     def random_gene(self):
         '''Returns a random gene'''
         # Randomly select what type of thing to add
-        type = random.randint(0, 2)
+        type = random.randint(0, 3)
 
+        # TODO: One to add output shape, another to add input shape
+        # TODO: Make function for random int that includes input/output shape as a possibility (one of those or random)
         match type:
             case 0:
                 return random.randint(*INT_RANGE)  # Random int
             case 1:
                 return random.uniform(*FLOAT_RANGE) # Random float
             case 2:
-                return 'push_tensor'#random.choice(list(self.instructions.instructions))  # Add instruction. Project to list for random.choice to work
+                return random.choice(list(self.instructions.instructions))  # Add instruction. Project to list for random.choice to work
+            case 3:
+                return torch.randn(self.random_int(), self.random_int(), requires_grad=True)  # Add tensor
 
     def evolve(self):
         '''Evolves the genome'''
@@ -82,7 +103,6 @@ class Population:
         self.population = [Genome() for _ in range(size)]
         for genome in self.population:
             genome.initialize_random(num_initial_genes)
-            #print(genome.genome)
 
     def forward_generation(self):
         '''Moves the population forward one generation'''
@@ -101,3 +121,5 @@ class Population:
                 network = genome.transcribe(train, test)
                 # Train the network
                 genome.fitness = network.fit()
+                if genome.fitness != float('inf'):
+                    print(genome.genome)
