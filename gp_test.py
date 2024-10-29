@@ -1,4 +1,4 @@
-from gp import *
+from Random.random_gp import *
 import ssl
 import torch
 import torchvision.datasets as datasets
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     # genome.genome = [torch.randn(784, 10, requires_grad=True), 'squeeze_tensor', 'tensor_matmul', 'tensor_flatten']
     # network = genome.transcribe(train_loader, train_loader)
     # network.fit()
-    pop = Population(1000, 20)
-    pop.run(1000, train_loader, train_loader)
+    pop = Population(25, 20)
+    pop.run(10000, train_loader, train_loader)
 
 

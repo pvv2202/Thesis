@@ -1,31 +1,28 @@
-import copy
 import torch
 from instructions import Instructions
-from network import Network
+from dag import *
 
 class Interpreter:
     '''Push Interpreter'''
-    def __init__(self):
-        # Initialize stacks
+    def __init__(self, input_shape, output_shape):
         self.stacks = {
             'int': [], # Really just Natural numbers
             'float': [],
             'bool': [],
+            'node': [],
             'str': [],
-            'tensor': [],
-            'exec': [],
+            'exec': [], # Contains the instructions
 
             'params': [], # Parameter stack for optimization
         }
 
-        # Initialize instructions
+        self.input_shape = input_shape
+        self.output_shape = output_shape
+
         self.instructions = Instructions()
 
-    # TODO: Need to run the program and then use params as push_tensor. They are added in order, so we should be able to use them in order
-    # TODO: Could just replace push_tensor with a modified version that takes them from params
     def read_genome(self, genome):
         '''Reads the genome and processes it into stacks'''
-        # Process genome into stacks
         for gene in genome:
             if type(gene) == int:
                 self.stacks['int'].append(gene)
@@ -33,17 +30,23 @@ class Interpreter:
                 self.stacks['float'].append(gene)
             elif type(gene) == bool:
                 self.stacks['bool'].append(gene)
-            elif type(gene) == torch.Tensor:
-                self.stacks['tensor'].append(gene)
-                self.stacks['params'].append(gene)
             elif gene in self.instructions.instructions:
                 self.stacks['exec'].append(gene)
             elif type(gene) == str:
                 self.stacks['str'].append(gene)
 
-    def create_network(self, train, test):
-        '''Creates a network from the stacks'''
-        stack_copy = copy.deepcopy(self.stacks)
-        return Network(stack_copy, train, test)
+    def run(self):
+        '''Runs the Program. Generates Computation Graph'''
+        root = Node(self.input_shape, 0, None) # Create root node with input shape, no function
+        dag = DAG(root)
+        self.stacks['node'].append(root)
 
-    # TODO: Add create_network function that creates a network and accepts train/test data to shape the input/output accordingly
+        # TODO: Could do fn = identity
+        while len(self.stacks['exec']) > 0:
+            # Get next instruction
+            instr = self.stacks['exec'].pop(0)
+            # Execute instruction
+            self.instructions(dag, self.stacks, instr)
+            # Interpreter reads an instruction. Instructions executes said instruction, which should create a node in the DAG
+            # TODO: When we first construct the graph, use references to the tensors in the stack. The instructions give a lambda argument
+            # TODO: To the graph

@@ -1,10 +1,5 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torchvision
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-import gp_old
 
 if __name__ == "__main__":
     # Define the transformation to apply to each image (convert to tensor and normalize)

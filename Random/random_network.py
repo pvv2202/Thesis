@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
-from instructions import Instructions
+from random_instructions import Instructions
 import torch.nn.functional as F
 import copy
-from utils import get_dim_size, broadcastable
+from Random.random_utils import get_dim_size
+
 
 # TODO: Maybe a different type of copy will allow not resetting params?
 
@@ -24,6 +25,18 @@ class Network(nn.Module):
 
         # Initialize instructions
         self.instructions = Instructions()
+
+    def __str__(self):
+        '''String representation of the network'''
+        desc = ""
+        for tensor in self.network['tensor']:
+            if desc == "":
+                desc += f'{tensor.size()}'
+            else:
+                desc += f', {tensor.size()}'
+        for exec in self.network['exec']:
+            desc += f', {exec}'
+        return desc
 
     # def output_layer(self, create=True):
     #     '''

@@ -1,38 +1,125 @@
 import torch
+import numpy as np
 
-def broadcastable(tensor1, tensor2):
+# TODO: Create tests for these functions
+
+def addable(shape1, shape2):
     '''
     Manually checks if two tensors are broadcast-compatible according to broadcasting rules.
     Broadcasting is possible if:
         1. The dimensions are equal, or
         2. One of the dimensions is 1.
     '''
-    dims1 = list(tensor1.size())  # List of dimensions for tensor1
-    dims2 = list(tensor2.size())  # List of dimensions for tensor2
-
     # Compare from right to left (last dimension to first)
-    for d1, d2 in zip(reversed(dims1), reversed(dims2)):
+    for d1, d2 in zip(reversed(shape1), reversed(shape2)):
         if d1 != d2 and d1 != 1 and d2 != 1:
             return False
     return True
 
+def add_shape(shape1, shape2):
+    '''Returns the shape of the resulting tensor from matrix addition according to PyTorch's rules.'''
+    # Convert shapes to lists
+    shape1 = list(shape1)
+    shape2 = list(shape2)
 
-def get_dim_size(tensor, i):
+    # Get the number of dimensions
+    dim1 = len(shape1)
+    dim2 = len(shape2)
+
+    # Pad the shorter shape with ones on the left (most significant dimensions)
+    if dim1 < dim2:
+        shape1 = [1] * (dim2 - dim1) + shape1
+    elif dim2 < dim1:
+        shape2 = [1] * (dim1 - dim2) + shape2
+
+    # Now both shapes have the same length
+    result_shape = []
+    # Iterate over the dimensions from left to right
+    for d1, d2 in zip(shape1, shape2):
+        if d1 == d2 or d1 == 1 or d2 == 1:
+            # If dimensions are equal or one of them is 1, broadcasting is possible
+            result_shape.append(max(d1, d2))
+        else:
+            # Otherwise, broadcasting is not possible. Should never happen because we check beforehand,
+            # but just in case
+            return None
+
+    return tuple(result_shape)
+
+def multable(shape1, shape2):
+    """Checks if the two shapes are compatible for PyTorch matrix multiplication."""
+    result_shape = mult_shape(shape1, shape2)
+    return result_shape is not None
+
+def mult_shape(shape1, shape2):
     '''
-    Returns the relevant dimension of the tensor on the stack. i corresponds to the dimension we care about in
-    reverse order (i.e. if i = 1, and A = (x, y, z, w), we will get w not x. If the tensor is multidimensional:
-        If b = (z, b) we only care about z for the next tensor to be compatible so that we have
-        a * b = (a, z) * (z, b) = (a, b). If there is a first or second dimension it doesn't matter since
-        matmul broadcasts.
-    If the tensor is 1D, it just returns the size. PyTorch automatically treats 1D tensors as column or row vectors
-    depending on order, so for b = (d) and a = (a, d), a * b = (a, d) * (d, 1) = (a)
+    Returns the shape of the resulting tensor from a matrix multiplication
+    between tensors of shape1 and shape2 according to PyTorch's matmul rules.
     '''
-    # If we somehow have a scalar tensor, just return 1
-    if tensor.dim() == 0:
-        return 1
-    # If the tensor is 1 dimensional we just return the size
-    elif tensor.dim() == 1:
-        return tensor.size()[0]
-    # Otherwise return specified index
+
+    # Convert shapes to list
+    shape1 = list(shape1)
+    shape2 = list(shape2)
+
+    # Get the number of dimensions
+    dim1 = len(shape1)
+    dim2 = len(shape2)
+
+    # Handle 1-D tensors
+    if dim1 == 1 and dim2 == 1:
+        # Dot product: returns a scalar
+        if shape1[0] != shape2[0]:
+            return None
+        return ()
+    elif dim1 == 1 and dim2 >= 2:
+        # Prepend 1 to shape1
+        shape1 = [1] + shape1
+        result_shape = batched_matmul_shape(shape1, shape2)
+        if result_shape is None:
+            return None
+        # Return without prepended 1
+        return result_shape[1:]
+    elif dim1 >= 2 and dim2 == 1:
+        # Append 1 to shape2
+        shape2 = shape2 + [1]
+        result_shape = batched_matmul_shape(shape1, shape2)
+        if result_shape is None:
+            return None
+        # Return without appended 1
+        return result_shape[:-1]
     else:
-        return tensor.size()[-i]
+        # Both tensors are at least 2-D
+        result_shape = batched_matmul_shape(shape1, shape2)
+        if result_shape is None:
+            return None
+        # Return the result shape
+        return result_shape
+
+def batched_matmul_shape(shape1, shape2):
+    """Computes the output shape for batched matrix multiplication"""
+
+    # Ensure both shapes have at least 2 dimensions
+    if len(shape1) < 2 or len(shape2) < 2:
+        return None
+
+    # Matrix dimensions (excluding batch and channel)
+    m1, n1 = shape1[-2], shape1[-1]
+    m2, n2 = shape2[-2], shape2[-1]
+
+    # Check if inner dimensions match
+    if n1 != m2:
+        return None
+
+    # Batch, channel dimensions
+    batch_shape1 = shape1[:-2]
+    batch_shape2 = shape2[:-2]
+
+    # Broadcast batch dimensions using numpy
+    try:
+        broadcast_shape = np.broadcast_shapes(batch_shape1, batch_shape2)
+    except ValueError as e:
+        return None
+
+    # Resulting shape
+    result_shape = list(broadcast_shape) + [m1, n2]
+    return tuple(result_shape)
