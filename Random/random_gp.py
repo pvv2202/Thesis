@@ -1,5 +1,5 @@
-from interpreter import Interpreter
-from instructions import Instructions
+from random_interpreter import Interpreter
+from random_instructions import Instructions
 import torch
 import copy
 import random
@@ -9,6 +9,11 @@ FLOAT_RANGE = (0.0, 1.0)
 OUTPUT_SIZE = 10
 INPUT_SIZE = 28
 BATCH_SIZE = 64
+
+#TODO: Look into allometric growth in biology. Think really hard about how to make variation robust. Make things accomodate expression
+#TODO: Try to find a way to do this intelligently. Need to find some way to make every combination work and accomodate a change (not ignore it).
+#TODO: How can inherit changes so that they function similarly. Need variation to affect everything that depends on it.
+#TODO: Look into biological evolution. How can we learn about this.
 
 class Genome:
     '''Genome of a Push Program'''
@@ -122,4 +127,4 @@ class Population:
                 # Train the network
                 genome.fitness = network.fit()
                 if genome.fitness != float('inf'):
-                    print(genome.genome)
+                    print(network)
