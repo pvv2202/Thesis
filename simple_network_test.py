@@ -19,7 +19,7 @@ if __name__ == '__main__':
     print(unique_labels)
     unique_train_labels = train_labels.unique()
     print(unique_train_labels)
-    print(f"Feature batch shape: {train_features.size()}")
+    print(f"Feature batch shape: {tuple(train_features.size())}")
     print(f"Labels batch shape: {train_labels.size()}")
 
     for images, labels in train_loader:
