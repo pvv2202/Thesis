@@ -1,17 +1,17 @@
 import torch
 
 class Network:
-    def __init__(self, dag, train, test, params):
+    def __init__(self, dag, train, test, params, device):
         '''Initialize network object'''
         self.dag = dag
         self.train = train
         self.test = test
         self.params = params
+        self.device = device
 
     def forward(self, x):
         '''Forward pass through the graph'''
         # Load tensor into initial node
-        # TODO: Somehow the root's reference to the rest of the graph gets lost
         self.dag.root.tensor = x
         out = self.dag.root
         # BFS
@@ -21,7 +21,7 @@ class Network:
             node = queue.pop(0)
             # print(f"Expected Shape: {node.shape}")
             queue.extend(self.dag.graph[node]) # Add children to queue
-            node.execute(self.params) # Execute the function at node
+            node.execute(self.params, self.device) # Execute the function at node
             # print(f"Actual Shape: {node.tensor.shape}")
             out = node
             # print(f"Intermediate Out: {out.tensor.shape}")
@@ -47,6 +47,7 @@ class Network:
             total_samples = 0
 
             for x, y in self.train:
+                x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 # Forward pass and compute loss
                 l = self.loss(x, y, loss_fn)

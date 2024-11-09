@@ -70,7 +70,8 @@ class Interpreter:
             dag=dag,
             train=self.train,
             test=self.test,
-            params=self.stacks['params']
+            params=self.stacks['params'],
+            device=self.device
         )
         return network
 
