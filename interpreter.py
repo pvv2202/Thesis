@@ -1,10 +1,14 @@
 import torch
+
+import utils
 from instructions import Instructions
 from dag import *
+from utils import *
+from network import Network
 
 class Interpreter:
     '''Push Interpreter'''
-    def __init__(self, input_shape, output_shape):
+    def __init__(self, train, test, activation):
         self.stacks = {
             'int': [], # Really just Natural numbers
             'float': [],
@@ -16,9 +20,18 @@ class Interpreter:
             'params': [], # Parameter stack for optimization
         }
 
-        self.input_shape = input_shape
-        self.output_shape = output_shape
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+        self.train = train
+        self.test = test
+        self.activation = activation
+
+        # Get input/output shapes
+        train_x, train_y = next(iter(train)) # Get example input/output
+        self.input_shape = tuple(train_x.size())
+        self.output_shape = (64, 10) # TODO: This changes depending on loss function/task. Temporary fix
+
+        # Initialize instructions
         self.instructions = Instructions()
 
     def read_genome(self, genome):
@@ -36,17 +49,98 @@ class Interpreter:
                 self.stacks['str'].append(gene)
 
     def run(self):
-        '''Runs the Program. Generates Computation Graph'''
-        root = Node(self.input_shape, 0, None) # Create root node with input shape, no function
+        '''Runs the program. Generates computation graph, prunes unnecessary nodes, and returns network'''
+        root = Node(shape=self.input_shape, layer=0, fn=None) # Create root node with input shape, no function
         dag = DAG(root)
         self.stacks['node'].append(root)
 
-        # TODO: Could do fn = identity
+        # Graph should be created after this
         while len(self.stacks['exec']) > 0:
             # Get next instruction
-            instr = self.stacks['exec'].pop(0)
+            instr = self.stacks['exec'].pop()
             # Execute instruction
-            self.instructions(dag, self.stacks, instr)
-            # Interpreter reads an instruction. Instructions executes said instruction, which should create a node in the DAG
-            # TODO: When we first construct the graph, use references to the tensors in the stack. The instructions give a lambda argument
-            # TODO: To the graph
+            self.instructions(dag, self.stacks, self.device, instr)
+
+        self.add_output(dag) # Add output layer
+
+        # TODO: We can prune the DAG by just removing any leaves layer-by-layer that aren't in the path of the output layer
+
+        # Create network
+        network = Network(
+            dag=dag,
+            train=self.train,
+            test=self.test,
+            params=self.stacks['params']
+        )
+        return network
+
+    def add_output(self, dag):
+        '''Adds the output layer to the DAG, There should always be at least 1 node in the stack'''
+        # Get the last node in the stack
+        last_node = self.stacks['node'].pop()
+        last_shape = last_node.shape
+        last_dim, output_dim = len(last_shape), len(self.output_shape)
+
+        if last_dim < output_dim:
+            # If last_dim < output_dim, we need project it up to the output dim.
+            for _ in range(output_dim - last_dim):
+                # Add a node that unsqueezes the last dimension to the dag.
+                node = Node(
+                    shape=last_shape + (1,),
+                    layer=last_node.layer + 1,
+                    fn=torch.unsqueeze,
+                    parents=[last_node],
+                    desc="Unsqueeze"
+                )
+                dag.add_edge(last_node, node)
+                last_node = node
+        elif last_dim > output_dim:
+            # TODO: If output_dim is 2/3D + batch, this won't work. I guess for now assume it won't be? There are ways to do this
+            # If last_dim > output_dim, Add a node that flattens the last dimension. Flatten ignores the batch dimension.
+            prev_batch = last_shape[0]
+            prod = 1
+            for x in last_shape[1:]:
+                prod *= x
+            last_shape = [prod]
+
+            node = Node(
+                shape=(prev_batch, last_shape[-1]),
+                layer=last_node.layer + 1,
+                fn=lambda x: torch.flatten(x, start_dim=1),
+                parents=[last_node],
+                desc="Flatten"
+            )
+            dag.add_edge(last_node, node)
+            last_node = node
+
+        # Add node that projects to the output shape. Need matrix. Result should be batch, output_shape[-1]
+        weights = torch.randn(last_shape[-1], self.output_shape[-1], requires_grad=True, device=self.device)
+        self.stacks['params'].append(weights)
+
+        node = Node(
+            shape=utils.mult_shape(last_node.shape, weights.shape),
+            layer=last_node.layer + 1,
+            fn=torch.matmul,
+            parents=[last_node],
+            weight_id=len(self.stacks['params']) - 1,
+            desc="Matmul"
+        )
+
+        dag.add_edge(last_node, node)
+
+        # TODO: Add support for activation functions
+        # last_node = node
+
+        # # Add activation function
+        # node = Node(
+        #     shape=self.output_shape,
+        #     layer=last_node.layer + 1,
+        #     fn=lambda x: torch.softmax(x, dim=1), # TODO: Need to update this. This assumes softmax but we should support other activation functions
+        #     parents=[last_node]
+        # )
+
+        # dag.add_edge(last_node, node)
+        # return dag
+
+        # We need the dimensions of the resulting matrix to = self.output_shape. This depends on the loss.
+        # Generally speaking, should probably be batch size x num_features.

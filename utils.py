@@ -118,8 +118,32 @@ def batched_matmul_shape(shape1, shape2):
     try:
         broadcast_shape = np.broadcast_shapes(batch_shape1, batch_shape2)
     except ValueError as e:
+        print(f'Ignore this warning: {e}')
         return None
 
     # Resulting shape
     result_shape = list(broadcast_shape) + [m1, n2]
     return tuple(result_shape)
+
+def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
+    # TODO: Need to make a separate function for maxpool2d
+    '''
+    Returns the shape of the resulting tensor from a 2D convolution operation
+    between a tensor of shape matrix and a kernel of shape kernel. Supports
+    asymmetric kernels and matrices. Bias is added by default
+    '''
+    # If the input is under 4D (batch, channel, h, w), or the kernel is not 3D (channel, h, w), we no-op
+    if len(matrix_shape) < 4 or len(kernel_shape) != 4:
+        return None
+
+    h_in, w_in = matrix_shape[-2:]
+    c_ko, c_ki, h_k, w_k = kernel_shape
+
+    # Compute the output dimensions
+    h_out = (h_in + 2 * padding - dilation * (h_k - 1) - 1) // stride + 1
+    w_out = (w_in + 2 * padding - dilation * (w_k - 1) - 1) // stride + 1
+
+    # Return the output shape (batch/channel are the same)
+    return (matrix_shape[0], c_ko, h_out, w_out)
+
+
