@@ -11,7 +11,7 @@ class Node:
         self.desc = desc
         self.tensor = None
 
-    def execute(self, params):
+    def execute(self, params, device):
         '''Execute the function on the input, store the result'''
         # Do nothing if no function or parents have no tensor
         if self.fn is None or any(parent.tensor is None for parent in self.parents):
@@ -24,6 +24,9 @@ class Node:
             self.tensor = self.fn(*parent_tensors)
         else:
             self.tensor = self.fn(*parent_tensors, params[self.weight_id])
+
+        # Send to device
+        self.tensor = self.tensor.to(device)
 
         return self.tensor
 
