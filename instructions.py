@@ -220,7 +220,6 @@ class Instructions:
         )
         dag.add_edge(u=pop_node, v=node)
 
-        stacks['params'].extend([kernel, bias])
         stacks['node'].append(node)
 
     #########################

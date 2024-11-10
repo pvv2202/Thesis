@@ -31,5 +31,5 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {genome.fitness}")
 
     '''Population Example'''
-    pop = gp.Population(size=10, num_initial_genes=30, train=train_loader, test=test_loader, activation=torch.softmax)
-    pop.run(100)
+    pop = gp.Population(size=3, num_initial_genes=30, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop.run(2)
