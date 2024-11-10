@@ -1,4 +1,5 @@
 import torch
+from collections import deque
 
 class Node:
     '''Node in a Directed, Acyclic Graph'''
@@ -52,15 +53,34 @@ class DAG:
         '''Remove an edge from u to v'''
         self.graph[u].remove(v)
 
+    def prune(self, node):
+        '''Prune all node that are not in the path from the root to node'''
+        visited = set()
+        queue = deque([node])
+
+        # BFS from node to root. Store nodes that we've visited along the way
+        while queue:
+            current = queue.popleft()
+            visited.add(current)
+            if current.parents:
+                queue.extend(current.parents)
+
+        # Go through all nodes in the graph.
+        for u in list(self.graph.keys()):
+            if u not in visited: # If the node is not in the path from root to node, remove it
+                del self.graph[u]
+            else: # Otherwise, remove any edges to nodes that are not in the path
+                self.graph[u] = [v for v in self.graph[u] if v in visited]
+
     def __str__(self):
         '''String representation of the DAG'''
         curr_layer = 0
-        queue = [self.root]
+        queue = deque([self.root])
         result = []
         layer_content = []
 
         while queue:
-            node = queue.pop(0)
+            node = queue.popleft()
             queue.extend(self.graph[node])
 
             if node.layer > curr_layer:
