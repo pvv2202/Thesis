@@ -129,6 +129,9 @@ class Interpreter:
 
         dag.add_edge(last_node, node)
 
+        # Prune all nodes that aren't in the path of the output layer
+        dag.prune(node)
+
         # TODO: Add support for activation functions
         # last_node = node
 

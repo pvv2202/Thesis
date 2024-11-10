@@ -1,4 +1,5 @@
 import torch
+from collections import deque
 
 class Network:
     def __init__(self, dag, train, test, params, device):
@@ -15,10 +16,10 @@ class Network:
         self.dag.root.tensor = x
         out = self.dag.root
         # BFS
-        queue = []
+        queue = deque()
         queue.extend(self.dag.graph[self.dag.root]) # Initialize to be root has no function
         while queue:
-            node = queue.pop(0)
+            node = queue.popleft()
             # print(f"Expected Shape: {node.shape}")
             queue.extend(self.dag.graph[node]) # Add children to queue
             node.execute(self.params, self.device) # Execute the function at node

@@ -94,7 +94,7 @@ class Population:
         # Copy the top 3 to the bottom 3
         self.population[:3] = copy.deepcopy(self.population[-3:])
         # Mutate the copied top 3
-        for genome in self.population[:3]:
+        for genome in self.population[:-3]:
             genome.UMAD()
 
     def run(self, generations):
@@ -113,7 +113,7 @@ class Population:
             print(f"Generation {gen_num} completed.")
 
         # Generate labels for each generation
-        labels = [f'Gen {i}' for i in range(1, generations + 1)]
+        labels = [i for i in range(1, generations + 1)]
 
         # Create box plot
         box = plt.boxplot(data,
