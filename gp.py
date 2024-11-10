@@ -1,6 +1,6 @@
 from interpreter import Interpreter
 from instructions import Instructions
-from network import Network
+import matplotlib.pyplot as plt
 import random
 import torch
 import copy
@@ -99,10 +99,36 @@ class Population:
 
     def run(self, generations):
         '''Runs the population on the train and test data'''
-        for _ in range(generations):
+        data = []
+        for gen_num in range(1, generations + 1):
+            gen = []
             for genome in self.population:
                 network = genome.transcribe()
                 print(network)
                 # Train the network
                 genome.fitness = network.fit()
+                gen.append(genome.fitness)
                 print(f"Genome fitness: {genome.fitness}")
+            data.append(gen)
+            print(f"Generation {gen_num} completed.")
+
+        # Generate labels for each generation
+        labels = [f'Gen {i}' for i in range(1, generations + 1)]
+
+        # Create box plot
+        box = plt.boxplot(data,
+                          vert=True,
+                          patch_artist=True,
+                          labels=labels,
+                          showmeans=True,
+                          meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
+                          medianprops=dict(color='blue'),
+                          whiskerprops=dict(color='black'),
+                          capprops=dict(color='black'),
+                          boxprops=dict(facecolor='lavender', color='black'),
+                          flierprops=dict(markerfacecolor='green', marker='D'))
+
+        plt.title('Box Plot of Accuracy Over Generations')
+        plt.xlabel('Generation')
+        plt.ylabel('Accuracy')
+        plt.show()
