@@ -41,15 +41,15 @@ class Genome:
     def random_gene(self):
         '''Returns a random gene'''
         # Randomly select what type of thing to add
-        type = random.randint(0, 3)
+        type = random.randint(0, 2)
 
         match type:
             case 0:
                 return random.choice(PRIMES)  # Random int
             case 1:
-                return random.uniform(*FLOAT_RANGE) # Random float
-            case 2:
-                return random.choice(list(self.instructions.instructions))  # Add instruction. Project to list for random.choice to work
+                return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
+            # case 2:
+            #     return random.uniform(*FLOAT_RANGE) # Random float
 
     def UMAD(self):
         '''
@@ -90,33 +90,56 @@ class Population:
     def forward_generation(self):
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Right now fitness is loss, so lower is better
-        self.population.sort(key=lambda x: x.fitness, reverse=True)
-        # Copy the top 3 to the bottom 3
-        self.population[:3] = copy.deepcopy(self.population[-3:])
+        self.population.sort(key=lambda x: x.fitness)
+        # Replace bottom 2 with copies of top 2
+        self.population[:3] = copy.deepcopy(self.population[-2:])
         # Mutate the copied top 3
-        for genome in self.population[:-3]:
+        for genome in self.population[:-2]:
             genome.UMAD()
 
-    def run(self, generations):
+    def run(self, generations, epochs):
         '''Runs the population on the train and test data'''
-        data = []
+        acc = []
+        size = []
         for gen_num in range(1, generations + 1):
-            gen = []
+            gen_acc = []
+            gen_size = []
             for genome in self.population:
+                gen_size.append(len(genome.genome))
                 network = genome.transcribe()
                 print(network)
                 # Train the network
-                genome.fitness = network.fit()
-                gen.append(genome.fitness)
+                genome.fitness = network.fit(epochs=epochs)
+                gen_acc.append(genome.fitness)
                 print(f"Genome fitness: {genome.fitness}")
-            data.append(gen)
+            acc.append(gen_acc)
+            size.append(gen_size)
+
             print(f"Generation {gen_num} completed.")
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]
 
-        # Create box plot
-        box = plt.boxplot(data,
+        # Create box plot for size
+        size_plot = plt.boxplot(size,
+                          vert=True,
+                          patch_artist=True,
+                          labels=labels,
+                          showmeans=True,
+                          meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
+                          medianprops=dict(color='blue'),
+                          whiskerprops=dict(color='black'),
+                          capprops=dict(color='black'),
+                          boxprops=dict(facecolor='lavender', color='black'),
+                          flierprops=dict(markerfacecolor='green', marker='D'))
+
+        plt.title('Box Plot of Size Over Generations')
+        plt.xlabel('Generation')
+        plt.ylabel('Size (Number of Genes)')
+        plt.show()
+
+        # Create box plot for accuracy
+        acc_plot = plt.boxplot(acc,
                           vert=True,
                           patch_artist=True,
                           labels=labels,
