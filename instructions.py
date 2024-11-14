@@ -125,6 +125,11 @@ class Instructions:
         if len(stacks['node'][-1].shape) < 4:
             return
 
+        # TODO: Consolidate this so we don't perform this calculation twice
+        # If we somehow end up with a shape that is less than 1, return
+        if utils.conv2d_shape(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2)[-1] < 1:
+            return
+
         # Pop the top node from the stack
         pop_node = stacks['node'].pop()
 
@@ -380,25 +385,25 @@ class Instructions:
         pop_int = stacks['int'].pop()
         Instructions.process_mat_scalar_ops(dag, stacks, lambda x: torch.add(x, pop_int), "Mat_Add_Int")
 
-    @staticmethod
-    def mat_add_float(dag, stacks):
-        '''Matrix Addition with Float'''
-        # Do nothing if there aren't enough floats in the stack
-        if len(stacks['float']) < 1:
-            return
-
-        pop_float = stacks['float'].pop()
-        Instructions.process_mat_scalar_ops(dag, stacks, lambda x: torch.add(x, pop_float), "Mat_Add_Float")
-
-    @staticmethod
-    def mat_mult_float(dag, stacks):
-        '''Matrix Multiplication with Float'''
-        # Do nothing if there aren't enough floats in the stack
-        if len(stacks['float']) < 1:
-            return
-
-        pop_float = stacks['float'].pop()
-        Instructions.process_mat_scalar_ops(dag, stacks, lambda x: torch.mul(x, pop_float), "Mat_Mult_Float")
+    # @staticmethod
+    # def mat_add_float(dag, stacks):
+    #     '''Matrix Addition with Float'''
+    #     # Do nothing if there aren't enough floats in the stack
+    #     if len(stacks['float']) < 1:
+    #         return
+    #
+    #     pop_float = stacks['float'].pop()
+    #     Instructions.process_mat_scalar_ops(dag, stacks, lambda x: torch.add(x, pop_float), "Mat_Add_Float")
+    #
+    # @staticmethod
+    # def mat_mult_float(dag, stacks):
+    #     '''Matrix Multiplication with Float'''
+    #     # Do nothing if there aren't enough floats in the stack
+    #     if len(stacks['float']) < 1:
+    #         return
+    #
+    #     pop_float = stacks['float'].pop()
+    #     Instructions.process_mat_scalar_ops(dag, stacks, lambda x: torch.mul(x, pop_float), "Mat_Mult_Float")
 
     #########################
     ######## Int Ops ########
