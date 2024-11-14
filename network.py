@@ -1,5 +1,6 @@
 import torch
 from collections import deque
+from line_profiler import profile
 
 class Network:
     def __init__(self, dag, train, test, params, device):
@@ -10,6 +11,7 @@ class Network:
         self.params = params
         self.device = device
 
+    @profile
     def forward(self, x):
         '''Forward pass through the graph'''
         # Load tensor into initial node
@@ -35,6 +37,9 @@ class Network:
         y_pred = self.forward(x)
         # print(f"Shape of y_pred: {y_pred.shape}")
         # print(f"Shape of y: {y.shape}")
+        if y_pred.shape is None:
+            return float('-inf')
+
         return loss(y_pred, y)
 
     def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam):
