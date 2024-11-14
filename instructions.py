@@ -332,10 +332,10 @@ class Instructions:
         '''Sigmoid Activation Function'''
         Instructions.process_torch_ops(dag, stacks, torch.sigmoid, "Sigmoid")
 
-    @staticmethod
-    def softmax(dag, stacks):
-        '''Softmax Activation Function'''
-        Instructions.process_torch_ops(dag, stacks, lambda x: torch.softmax(x, dim=1), "Softmax")
+    # @staticmethod
+    # def softmax(dag, stacks):
+    #     '''Softmax Activation Function'''
+    #     Instructions.process_torch_ops(dag, stacks, lambda x: torch.softmax(x, dim=1), "Softmax")
 
     # Others
     @staticmethod
@@ -372,15 +372,15 @@ class Instructions:
         # Add new node to stack
         stacks['node'].append(node)
 
-    @staticmethod
-    def mat_add_int(dag, stacks):
-        '''Matrix Addition with Int'''
-        # Do nothing if there aren't enough ints in the stack
-        if len(stacks['int']) < 1:
-            return
-
-        pop_int = stacks['int'].pop()
-        Instructions.process_mat_scalar_ops(dag, stacks, lambda x: torch.add(x, pop_int), "Mat_Add_Int")
+    # @staticmethod
+    # def mat_add_int(dag, stacks):
+    #     '''Matrix Addition with Int'''
+    #     # Do nothing if there aren't enough ints in the stack
+    #     if len(stacks['int']) < 1:
+    #         return
+    #
+    #     pop_int = stacks['int'].pop()
+    #     Instructions.process_mat_scalar_ops(dag, stacks, lambda x: torch.add(x, pop_int), "Mat_Add_Int")
 
     # @staticmethod
     # def mat_add_float(dag, stacks):

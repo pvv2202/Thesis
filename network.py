@@ -37,7 +37,8 @@ class Network:
         y_pred = self.forward(x)
         # print(f"Shape of y_pred: {y_pred.shape}")
         # print(f"Shape of y: {y.shape}")
-        if y_pred.shape is None:
+        if y_pred is None:
+            print("Invalid network")
             return float('-inf')
 
         return loss(y_pred, y)
@@ -53,10 +54,13 @@ class Network:
             total_samples = 0
 
             for x, y in self.train:
-                x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 # Forward pass and compute loss
                 l = self.loss(x, y, loss_fn)
+
+                if type(l) == float:
+                    return l
+
                 # Backpropagation
                 l.backward()
 
