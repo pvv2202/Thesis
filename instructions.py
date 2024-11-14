@@ -125,9 +125,8 @@ class Instructions:
         if len(stacks['node'][-1].shape) < 4:
             return
 
-        res_shape = utils.conv2d_shape(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2)
-
-        if res_shape[-1] < 1:
+        # Check if maxpooling is possible.
+        if not utils.conv2dable(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2):
             return
 
         # Pop the top node from the stack
@@ -135,7 +134,7 @@ class Instructions:
 
         # Create new node
         node = Node(
-            shape=res_shape,
+            shape=utils.conv2d_shape(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2),
             layer=pop_node.layer + 1,
             fn=lambda x: F.max_pool2d(x, kernel_size=2, stride=2), # For now, hardcode kernel size and stride
             parents=[pop_node],
@@ -196,6 +195,9 @@ class Instructions:
             return
         # Check if kernel size is valid
         if stacks['int'][-1] > stacks['node'][-1].shape[-1] or stacks['int'][-1] > stacks['node'][-1].shape[-2]:
+            return
+        # If we can't convolve, just return
+        if not utils.conv2dable(stacks['node'][-1].shape, (stacks['int'][-2], stacks['node'][-1].shape[1], stacks['int'][-1], stacks['int'][-1])):
             return
 
         # Pop the top node, kernel size, and number of filters from the stack

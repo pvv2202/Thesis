@@ -8,7 +8,7 @@ import copy
 PRIMES = [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 4, 8, 16, 32, 64, 128] # Fundamental Theorem of Arithmetic
 FLOAT_RANGE = (0.0, 1.0)
 ADD_RATE = 0.6
-REMOVE_RATE = 0.2
+REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 
 # TODO: Just in general, is there a better way to go about the train/test thing? Like could I just give it to the network?
 # TODO: Track sizes over time. Usually bad to do it during runs

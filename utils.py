@@ -125,8 +125,18 @@ def batched_matmul_shape(shape1, shape2):
     result_shape = list(broadcast_shape) + [m1, n2]
     return tuple(result_shape)
 
+def conv2dable(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
+    '''
+    Checks if a 2D convolution operation is possible between a tensor of shape matrix and a kernel of shape kernel.
+    Supports asymmetric kernels and matrices. Bias is added by default.
+    '''
+    shape = conv2d_shape(matrix_shape, kernel_shape, stride, padding, dilation)
+    if shape is None or shape[-1] < 1:
+        return False
+
+    return True
+
 def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
-    # TODO: Need to make a separate function for maxpool2d
     '''
     Returns the shape of the resulting tensor from a 2D convolution operation
     between a tensor of shape matrix and a kernel of shape kernel. Supports
