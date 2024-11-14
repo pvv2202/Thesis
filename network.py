@@ -54,6 +54,7 @@ class Network:
             total_samples = 0
 
             for x, y in self.train:
+                x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 # Forward pass and compute loss
                 l = self.loss(x, y, loss_fn)

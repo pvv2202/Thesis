@@ -19,12 +19,6 @@ if __name__ == "__main__":
     train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True) # drop_last=True to ensure all batches are the same size
     test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True) # drop_last=True to ensure all batches are the same size
 
-    # Print the shape of the first batch of images and labels
-    for x, y in train_loader:
-        x.to(device), y.to(device)
-    for x, y in test_loader:
-        x.to(device), y.to(device)
-
     '''Example Network That Performs Well on MNIST'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
     # genome.genome = [
@@ -40,7 +34,7 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {genome.fitness}")
 
     '''Population Example'''
-    pop = gp.Population(size=10, num_initial_genes=15, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop = gp.Population(size=10, num_initial_genes=25, train=train_loader, test=test_loader, activation=torch.softmax)
     pop.run(generations=10, epochs=1)
 
     for genome in pop.population:
