@@ -134,7 +134,7 @@ class Instructions:
 
         # Create new node
         node = Node(
-            shape=utils.conv2d_shape(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2),
+            shape=utils.conv2d_shape(pop_node.shape, (pop_node.shape[1], pop_node.shape[1], 2, 2), stride=2),
             layer=pop_node.layer + 1,
             fn=lambda x: F.max_pool2d(x, kernel_size=2, stride=2), # For now, hardcode kernel size and stride
             parents=[pop_node],
