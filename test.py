@@ -8,6 +8,9 @@ if __name__ == "__main__":
     transform = transforms.Compose([transforms.ToTensor(),
                                     transforms.Normalize((0.5,), (0.5,))])
 
+    # Find device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # Load the MNIST training and test datasets
     train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
     test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
@@ -15,6 +18,12 @@ if __name__ == "__main__":
     # Create data loaders for batching
     train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True) # drop_last=True to ensure all batches are the same size
     test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True) # drop_last=True to ensure all batches are the same size
+
+    # Print the shape of the first batch of images and labels
+    for x, y in train_loader:
+        x.to(device), y.to(device)
+    for x, y in test_loader:
+        x.to(device), y.to(device)
 
     '''Example Network That Performs Well on MNIST'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
@@ -31,8 +40,8 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {genome.fitness}")
 
     '''Population Example'''
-    pop = gp.Population(size=20, num_initial_genes=20, train=train_loader, test=test_loader, activation=torch.softmax)
-    pop.run(generations=20, epochs=1)
+    pop = gp.Population(size=10, num_initial_genes=15, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop.run(generations=10, epochs=1)
 
     for genome in pop.population:
         print(genome.fitness)

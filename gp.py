@@ -7,8 +7,8 @@ import copy
 
 PRIMES = [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 4, 8, 16, 32, 64, 128] # Fundamental Theorem of Arithmetic
 FLOAT_RANGE = (0.0, 1.0)
-ADD_RATE = 0.18
-REMOVE_RATE = 1/(1 + ADD_RATE)
+ADD_RATE = 0.6
+REMOVE_RATE = 0.2
 
 # TODO: Just in general, is there a better way to go about the train/test thing? Like could I just give it to the network?
 # TODO: Track sizes over time. Usually bad to do it during runs
@@ -57,20 +57,30 @@ class Genome:
         through genome again. With remove probability = add probability/(1 + add probability), remove a gene
         '''
         # Add genes
-        i = 0
-        while i < len(self.genome):
+        add_genome = []
+        for gene in self.genome:
             if random.random() <= ADD_RATE:
-                i += random.choice([0, 1])
-                self.genome.insert(i, self.random_gene())
-            i += 1
+                if random.random() <= 0.5:
+                    # Add before
+                    add_genome.append(gene)
+                    add_genome.append(self.random_gene())
+                else:
+                    # Add after
+                    add_genome.append(self.random_gene())
+                    add_genome.append(gene)
+            else:
+                add_genome.append(gene)
 
         # Remove genes
-        i = 0
-        while i < len(self.genome):
+        new_genome = []
+        for gene in add_genome:
+            # If it's going to be removed, just don't add it
             if random.random() <= REMOVE_RATE:
-                self.genome.pop(i)
-            else:
-                i += 1 # Only increment i if we didn't remove
+                continue
+            new_genome.append(gene)
+
+        # Update genome
+        self.genome = new_genome
 
     def transcribe(self):
         '''Transcribes the genome to create a network. Returns the network'''
@@ -91,6 +101,7 @@ class Population:
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Right now fitness is loss, so lower is better
         self.population.sort(key=lambda x: x.fitness)
+        print([genome.fitness for genome in self.population])
 
         # Copy the top 5 genomes
         for i in range(5):
@@ -118,7 +129,12 @@ class Population:
             acc.append(gen_acc)
             size.append(gen_size)
 
-            print(f"Generation {gen_num} completed.")
+            print("\n--------------------------------------------------")
+            print(f"Generation {gen_num} Completed")
+            print("--------------------------------------------------\n")
+
+            self.forward_generation()
+
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]
