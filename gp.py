@@ -5,7 +5,7 @@ import random
 import torch
 import copy
 
-PRIMES = [1, 2, 3, 5, 7, 11, 13, 17, 19, 23] # Fundamental Theorem of Arithmetic
+PRIMES = [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 4, 8, 16, 32, 64, 128] # Fundamental Theorem of Arithmetic
 FLOAT_RANGE = (0.0, 1.0)
 ADD_RATE = 0.18
 REMOVE_RATE = 1/(1 + ADD_RATE)
@@ -41,15 +41,15 @@ class Genome:
     def random_gene(self):
         '''Returns a random gene'''
         # Randomly select what type of thing to add
-        type = random.randint(0, 2)
+        type = random.randint(0, 1)
 
         match type:
             case 0:
                 return random.choice(PRIMES)  # Random int
             case 1:
-                return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
-            # case 2:
-            #     return random.uniform(*FLOAT_RANGE) # Random float
+                return random.choice(list(self.instructions.instructions))  # Add instruction. Project to list for random.choice to work
+            case 2:
+                return random.uniform(*FLOAT_RANGE) # Random float
 
     def UMAD(self):
         '''
@@ -91,16 +91,17 @@ class Population:
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Right now fitness is loss, so lower is better
         self.population.sort(key=lambda x: x.fitness)
-        # Replace bottom 2 with copies of top 2
-        self.population[:3] = copy.deepcopy(self.population[-2:])
-        # Mutate the copied top 3
-        for genome in self.population[:-2]:
+        for i in range(5):
+            self.population[i] = copy.deepcopy(self.population[-(i+1)]) # Replace bottom 5 with top 5
+        # Mutate everything
+        for genome in self.population:
             genome.UMAD()
 
     def run(self, generations, epochs):
         '''Runs the population on the train and test data'''
         acc = []
         size = []
+        best = [None, float('-inf')]
         for gen_num in range(1, generations + 1):
             gen_acc = []
             gen_size = []
@@ -110,6 +111,8 @@ class Population:
                 print(network)
                 # Train the network
                 genome.fitness = network.fit(epochs=epochs)
+                if genome.fitness > best[1]:
+                    best = [genome, genome.fitness]
                 gen_acc.append(genome.fitness)
                 print(f"Genome fitness: {genome.fitness}")
             acc.append(gen_acc)
@@ -155,3 +158,5 @@ class Population:
         plt.xlabel('Generation')
         plt.ylabel('Accuracy')
         plt.show()
+
+        print(f"Best Genome: {best[0].genome}, Fitness: {best[1]}")
