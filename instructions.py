@@ -125,9 +125,9 @@ class Instructions:
         if len(stacks['node'][-1].shape) < 4:
             return
 
-        # TODO: Consolidate this so we don't perform this calculation twice
-        # If we somehow end up with a shape that is less than 1, return
-        if utils.conv2d_shape(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2)[-1] < 1:
+        res_shape = utils.conv2d_shape(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2)
+
+        if res_shape[-1] < 1:
             return
 
         # Pop the top node from the stack
@@ -135,7 +135,7 @@ class Instructions:
 
         # Create new node
         node = Node(
-            shape=utils.conv2d_shape(pop_node.shape, (pop_node.shape[1], pop_node.shape[1], 2, 2), stride=2), # Get the shape of the resulting tensor
+            shape=res_shape,
             layer=pop_node.layer + 1,
             fn=lambda x: F.max_pool2d(x, kernel_size=2, stride=2), # For now, hardcode kernel size and stride
             parents=[pop_node],
@@ -190,15 +190,12 @@ class Instructions:
         '''2D Convolution'''
         # Do nothing if there aren't enough nodes or integers in the stack
         if len(stacks['node']) < 1 or len(stacks['int']) < 2:
-            print("Not enough ints")
             return
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
         if len(stacks['node'][-1].shape) < 4:
-            print("Not enough dimensions")
             return
         # Check if kernel size is valid
         if stacks['int'][-1] > stacks['node'][-1].shape[-1] or stacks['int'][-1] > stacks['node'][-1].shape[-2]:
-            print("Kernel size too large")
             return
 
         # Pop the top node, kernel size, and number of filters from the stack
