@@ -1,3 +1,5 @@
+from keras.src.metrics.accuracy_metrics import accuracy
+
 from interpreter import Interpreter
 from instructions import Instructions
 import matplotlib.pyplot as plt
@@ -5,15 +7,13 @@ import random
 import torch
 import copy
 
+# TODO: Probably change this primes thing
 PRIMES = [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 4, 8, 16, 32, 64, 128] # Fundamental Theorem of Arithmetic
 FLOAT_RANGE = (0.0, 1.0)
-ADD_RATE = 0.6
+ADD_RATE = 0.18
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 
-# TODO: Just in general, is there a better way to go about the train/test thing? Like could I just give it to the network?
-# TODO: Track sizes over time. Usually bad to do it during runs
-# TODO: Use UMAD (uniform mutation by addition and deletion). Deletion rate should be addRate/(1 + addRate). Do 2 sweeps. First adds on either side of each index, second deletes at each index
-# TODO: Different rates can change a lot
+# TODO: Take random genomes and run UMAD a bunch just to see what happens. Neutral landscapes?
 
 class Genome:
     '''Genome of a Push Program'''
@@ -60,7 +60,7 @@ class Genome:
         add_genome = []
         for gene in self.genome:
             if random.random() <= ADD_RATE:
-                if random.random() <= 0.5:
+                if random.random() < 0.5:
                     # Add before
                     add_genome.append(gene)
                     add_genome.append(self.random_gene())
@@ -97,15 +97,34 @@ class Population:
         for genome in self.population:
             genome.initialize_random(num_initial_genes)
 
-    def forward_generation(self):
+    def tournament(self, size):
+        '''Selects the best genome from a tournament of size size'''
+        tournament = random.sample(self.population, size)
+        tournament.sort(key=lambda x: x.fitness)
+        return tournament[0]
+
+    def forward_generation(self, method='tournament', size=5):
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Right now fitness is loss, so lower is better
         self.population.sort(key=lambda x: x.fitness)
         print([genome.fitness for genome in self.population])
 
-        # Copy the top 5 genomes
-        for i in range(5):
-            self.population[i] = copy.deepcopy(self.population[-(i+1)])
+        # TODO: Implement a better selection algorithm. Don't select on the basis of a single number
+        # TODO: Probably select on a lexicase-like combination of things. Scale for specific examples
+        # TODO: Look into historically-assessed hardware. Think about epsilon. Median absolute deviation from median.
+        # TODO: All errors on a case. calcualte different epsilon for each case. Take median error on a case, and calculate
+        # TODO: Everybody's deviation from that median error. Take median of those and use that as epsilon.
+        # TODO: Population of 100, evaluate them. Make the next generation. Starts empty. Select a parent (or two) for each slot
+        # TODO: Do this all the way
+
+        match method:
+            case 'tournament':
+                new_population = []
+                for _ in range(self.size):
+                    new_population.append(self.tournament(size))
+            case 'elite':
+                for i in range(size):
+                    self.population[i] = copy.deepcopy(self.population[-(i+1)])
 
         # Mutate everything
         for genome in self.population:
@@ -123,7 +142,12 @@ class Population:
                 network = genome.transcribe()
                 print(network)
                 # Train the network
-                genome.fitness = network.fit(epochs=epochs)
+                network.fit(epochs=epochs)
+
+                # Evaluate the network
+                loss, accuracy = network.evaluate()
+                genome.fitness = accuracy
+
                 gen_acc.append(genome.fitness)
                 print(f"Genome fitness: {genome.fitness}")
             acc.append(gen_acc)
@@ -133,8 +157,7 @@ class Population:
             print(f"Generation {gen_num} Completed")
             print("--------------------------------------------------\n")
 
-            self.forward_generation()
-
+            self.forward_generation(method='tournament', size=5)
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]

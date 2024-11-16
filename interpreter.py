@@ -60,6 +60,10 @@ class Interpreter:
             instr = self.stacks['exec'].pop()
             # Execute instruction
             self.instructions(dag, self.stacks, self.device, instr)
+            if self.stacks['node'][-1].shape == None:
+                print(self.stacks['node'][-1].desc)
+                for parent in self.stacks['node'][-1].parents:
+                    print(parent.shape)
 
         self.add_output(dag) # Add output layer
 
