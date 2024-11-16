@@ -134,6 +134,7 @@ class Population:
         '''Runs the population on the train and test data'''
         acc = []
         size = []
+        best_genome = (None, float('-inf'))
         for gen_num in range(1, generations + 1):
             gen_acc = []
             gen_size = []
@@ -148,6 +149,10 @@ class Population:
                 loss, accuracy = network.evaluate()
                 genome.fitness = accuracy
 
+                # Update best genome
+                if accuracy > best_genome[1]:
+                    best_genome = (genome, accuracy)
+
                 gen_acc.append(genome.fitness)
                 print(f"Genome fitness: {genome.fitness}")
             acc.append(gen_acc)
@@ -158,6 +163,8 @@ class Population:
             print("--------------------------------------------------\n")
 
             self.forward_generation(method='tournament', size=5)
+
+        print(f"Best genome: {best_genome[0].genome}")
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]
