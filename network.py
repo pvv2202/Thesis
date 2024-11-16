@@ -32,13 +32,13 @@ class Network:
         # print(f"Output Shape: {out.tensor.shape}")
         return out.tensor # Output node will always come last since we step layer by layer
 
-    def loss(self, x, y, loss=torch.nn.functional.cross_entropy):
+    def loss(self, y_pred, y, loss=torch.nn.functional.cross_entropy):
         '''Calculate loss'''
-        y_pred = self.forward(x)
         # print(f"Shape of y_pred: {y_pred.shape}")
         # print(f"Shape of y: {y.shape}")
         if y_pred is None:
             print("Invalid network")
+            print(self.dag)
             return float('-inf')
 
         return loss(y_pred, y)
@@ -47,51 +47,52 @@ class Network:
         '''Fit the model'''
         optimizer = optimizer_class(self.params, lr=learning_rate)
 
-        final_accuracy = 0
         for epoch in range(epochs):
-            epoch_loss = 0
-            correct_predictions = 0
-            total_samples = 0
-
             for x, y in self.train:
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
+                y_pred = self.forward(x)
                 # Forward pass and compute loss
-                l = self.loss(x, y, loss_fn)
+                l = self.loss(y_pred, y, loss_fn)
 
+                # If the network is invalid, return
                 if type(l) == float:
-                    return l
+                    return
 
                 # Backpropagation
                 l.backward()
 
-                # for param in self.params:
-                #     if param.grad is not None:
-                #         print(param.grad.abs().mean())
-
                 # Update parameters
-
-                # old_params = [param.clone() for param in self.params]
                 optimizer.step()
-                # for old_param, param in zip(old_params, self.params):
-                #     print((old_param - param).abs().mean())
 
-                # Accumulate loss
-                epoch_loss += l.item()
+    def evaluate(self, loss_fn=torch.nn.functional.cross_entropy):
+        '''Evaluate the model on the test set. Returns loss, accuracy tuple'''
+        correct_predictions = 0
+        total_loss = 0
+        test_sum = 0
+
+        for x, y in self.test:
+            x, y = x.to(self.device), y.to(self.device)
+            # Forward pass and compute
+            with torch.no_grad():
+                y_pred = self.forward(x)
+                l = self.loss(y_pred, y, loss_fn)
+                # If invalid, just return inf, -inf
+                if type(l) == float:
+                    return float('inf'), float('-inf')
+                total_loss += l.item()
+
+                test_sum += len(y) # Should be a batch of labels
 
                 # Calculate accuracy
-                with torch.no_grad():
-                    outputs = self.forward(x)  # Forward pass
-                    _, predicted = torch.max(outputs, 1)  # Get predicted class
-                    correct_predictions += (predicted == y).sum().item()  # Count correct predictions
-                    total_samples += y.size(0)  # Count total samples
+                _, predictions = torch.max(y_pred, -1) # Should always be last dimension
+                correct_predictions += (predictions == y).sum().item()
 
-            # Calculate epoch accuracy
-            final_accuracy = epoch_accuracy = correct_predictions / total_samples
-            print(f'Epoch {epoch + 1}/{epochs}, Loss: {epoch_loss / len(self.train)}, Accuracy: {epoch_accuracy * 100:.2f}%')
+        # Calculate accuracy
+        accuracy = correct_predictions / test_sum
+        print(f'Test set: Loss: {total_loss / len(self.test)}, Accuracy: {accuracy * 100:.2f}%')
 
-        # Return accuracy from last epoch
-        return final_accuracy
+        return total_loss, accuracy
 
     def __str__(self):
         return self.dag.__str__()

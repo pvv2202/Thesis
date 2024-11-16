@@ -89,7 +89,7 @@ class Instructions:
             return
 
         # If not multiplicable, return (noop)
-        if not utils.multable(stacks['node'][-2].shape, stacks['node'][-1].shape):
+        if not utils.multable(stacks['node'][-1].shape, stacks['node'][-2].shape):
             return
 
         # Pop the top 2 nodes from the stack
@@ -265,7 +265,7 @@ class Instructions:
             return
 
         # If not addable, return (noop)
-        if not utils.addable(stacks['node'][-2].shape, stacks['node'][-1].shape):
+        if not utils.addable(stacks['node'][-1].shape, stacks['node'][-2].shape):
             return
 
         # Pop the top 2 nodes from the stack

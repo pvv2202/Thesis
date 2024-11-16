@@ -131,7 +131,7 @@ def conv2dable(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
     Supports asymmetric kernels and matrices. Bias is added by default.
     '''
     shape = conv2d_shape(matrix_shape, kernel_shape, stride, padding, dilation)
-    if shape is None or shape[-1] < 1:
+    if shape is None or any(dim < 1 for dim in shape):
         return False
 
     return True
