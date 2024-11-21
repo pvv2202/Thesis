@@ -74,6 +74,9 @@ class Instructions:
     @staticmethod
     def matmul_dup(dag, stacks, device):
         '''Matrix Multiplication with Duplicate'''
+        # Check if there are enough nodes and ints in the stack
+        if len(stacks['node']) < 1 or len(stacks['int']) < 1:
+            return
         # Get the top node from the stack
         pop_node = stacks['node'][-1]
         # Call matmul
@@ -104,8 +107,12 @@ class Instructions:
             parents=[pop_node1, pop_node2],
             desc="Matmul_Stack"
         )
-        dag.add_edge(u=pop_node1, v=node) # Edge between node1 and new node
-        dag.add_edge(u=pop_node2, v=node) # Edge between node2 and new node
+
+        # Add whichever node is lower in the graph so that both will have been processed.
+        if pop_node1.layer > pop_node2.layer:
+            dag.add_edge(u=pop_node1, v=node)
+        else:
+            dag.add_edge(u=pop_node2, v=node)
 
         stacks['node'].append(node)
 
@@ -253,7 +260,7 @@ class Instructions:
             weight_id=len(stacks['params']) - 1,
             desc="Mat_Add"
         )
-        dag.add_edge(u=pop_node, v=node) # Edge between node1 and new node
+        dag.add_edge(u=pop_node, v=node) # Edge between popped node and new node
 
         stacks['node'].append(node)
 
@@ -280,13 +287,21 @@ class Instructions:
             parents=[pop_node1, pop_node2],
             desc="Mat_Add_Stack"
         )
-        dag.add_edge(u=pop_node1, v=node)
+        # dag.add_edge(u=pop_node1, v=node) # TODO: Think about how to improve this so the graph representation makes more sense?
+        # Add whichever node is lower in the graph so that both will have been processed.
+        if pop_node1.layer > pop_node2.layer:
+            dag.add_edge(u=pop_node1, v=node)
+        else:
+            dag.add_edge(u=pop_node2, v=node)
 
         stacks['node'].append(node)
 
     @staticmethod
     def mat_add_dup(dag, stacks, device):
         '''Matrix Addition with Duplicate'''
+        # Check if there are enough nodes in the stack
+        if len(stacks['node']) < 1:
+            return
         # Get the top node from the stack
         pop_node = stacks['node'][-1]
         # Call mat_add
@@ -349,30 +364,30 @@ class Instructions:
     ### Matrix Scalar Ops ###
     #########################
 
-    @staticmethod
-    def process_mat_scalar_ops(dag, stacks, fn, desc):
-        '''Pop the top tensor from the tensor stack and the top int from the int stack'''
-        # Do nothing if there aren't enough tensors in the stack
-        if len(stacks['node']) < 1:
-            return
-
-        # Pop the top node and int from the stack
-        pop_node = stacks['node'].pop()
-
-        # Create new node
-        node = Node(
-            shape=pop_node.shape,
-            layer=pop_node.layer + 1,
-            fn=fn,
-            parents=[pop_node],
-            desc=desc
-        )
-
-        # Add the new node to the graph
-        dag.add_edge(u=pop_node, v=node)
-
-        # Add new node to stack
-        stacks['node'].append(node)
+    # @staticmethod
+    # def process_mat_scalar_ops(dag, stacks, fn, desc):
+    #     '''Pop the top tensor from the tensor stack and the top int from the int stack'''
+    #     # Do nothing if there aren't enough tensors in the stack
+    #     if len(stacks['node']) < 1:
+    #         return
+    #
+    #     # Pop the top node and int from the stack
+    #     pop_node = stacks['node'].pop()
+    #
+    #     # Create new node
+    #     node = Node(
+    #         shape=pop_node.shape,
+    #         layer=pop_node.layer + 1,
+    #         fn=fn,
+    #         parents=[pop_node],
+    #         desc=desc
+    #     )
+    #
+    #     # Add the new node to the graph
+    #     dag.add_edge(u=pop_node, v=node)
+    #
+    #     # Add new node to stack
+    #     stacks['node'].append(node)
 
     # @staticmethod
     # def mat_add_int(dag, stacks):
@@ -408,24 +423,24 @@ class Instructions:
     ######## Int Ops ########
     #########################
 
-    @staticmethod
-    def process_ints(stacks, fn):
-        '''Pop the top 2 ints from the int stack'''
-        # Do nothing if there aren't enough integers in the stack
-        if len(stacks['int']) < 2:
-            return
-
-        fn(stacks['int'].pop(), stacks['int'].pop())
+    # @staticmethod
+    # def process_ints(stacks, fn):
+    #     '''Pop the top 2 ints from the int stack'''
+    #     # Do nothing if there aren't enough integers in the stack
+    #     if len(stacks['int']) < 2:
+    #         return
+    #
+    #     fn(stacks['int'].pop(), stacks['int'].pop())
 
     # @staticmethod
     # def add_int(stacks):
     #     '''Add ints from int stack'''
     #     Instructions.process_ints(stacks, lambda x, y: x + y)
 
-    @staticmethod
-    def mult_int(stacks):
-        '''Multiply ints from int stack'''
-        Instructions.process_ints(stacks, lambda x, y: x * y)
+    # @staticmethod
+    # def mult_int(stacks):
+    #     '''Multiply ints from int stack'''
+    #     Instructions.process_ints(stacks, lambda x, y: x * y)
 
     # @staticmethod
     # def dup_int(stacks):

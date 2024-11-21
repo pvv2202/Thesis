@@ -22,14 +22,18 @@ class Network:
         queue.extend(self.dag.graph[self.dag.root]) # Initialize to be root has no function
         while queue:
             node = queue.popleft()
-            # print(f"Expected Shape: {node.shape}")
             queue.extend(self.dag.graph[node]) # Add children to queue
             node.execute(self.params, self.device) # Execute the function at node
-            # print(f"Actual Shape: {node.tensor.shape}")
+            if node.shape != node.tensor.shape:
+                print(f"Node: {node.desc}")
+                print(f"Expected Shape: {node.shape}")
+                print(f"Actual Shape: {node.tensor.shape}")
             out = node
-            # print(f"Intermediate Out: {out.tensor.shape}")
 
-        # print(f"Output Shape: {out.tensor.shape}")
+        if len(out.tensor.shape) > 2:
+            print("Output too big")
+            return None
+
         return out.tensor # Output node will always come last since we step layer by layer
 
     def loss(self, y_pred, y, loss=torch.nn.functional.cross_entropy):
