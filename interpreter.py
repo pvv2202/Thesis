@@ -13,11 +13,14 @@ class Interpreter:
             'int': [], # Really just Natural numbers
             'float': [],
             'bool': [],
-            'node': deque([]),
             'str': [],
             'exec': [], # Contains the instructions
+        }
 
-            'params': [], # Parameter stack for optimization
+        # Network structures
+        self.net = {
+            'nodes': deque([]), # Queue holding nodes added to the graph
+            'params': [] # Parameter stack for PyTorch autograd
         }
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -53,17 +56,17 @@ class Interpreter:
         '''Runs the program. Generates computation graph, prunes unnecessary nodes, and returns network'''
         root = Node(shape=self.input_shape, layer=0, fn=None) # Create root node with input shape, no function
         dag = DAG(root)
-        self.stacks['node'].append(root)
+        self.net['nodes'].append(root)
 
         # Graph should be created after this
         while len(self.stacks['exec']) > 0:
             # Get next instruction
             instr = self.stacks['exec'].pop()
             # Execute instruction
-            self.instructions(dag, self.stacks, self.device, instr)
-            if self.stacks['node'][-1].shape == None:
-                print(self.stacks['node'][-1].desc)
-                for parent in self.stacks['node'][-1].parents:
+            self.instructions(dag, self.net, self.stacks, self.device, instr)
+            if self.net['nodes'][-1].shape == None:
+                print(self.net['nodes'][-1].desc)
+                for parent in self.net['nodes'][-1].parents:
                     print(parent.shape)
 
         self.add_output(dag) # Add output layer
@@ -73,7 +76,7 @@ class Interpreter:
             dag=dag,
             train=self.train,
             test=self.test,
-            params=self.stacks['params'],
+            params=self.net['params'],
             device=self.device
         )
         return network
@@ -81,7 +84,7 @@ class Interpreter:
     def add_output(self, dag):
         '''Adds the output layer to the DAG, There should always be at least 1 node in the stack'''
         # Get the last node in the stack
-        last_node = self.stacks['node'].popleft()
+        last_node = self.net['nodes'].popleft()
         last_shape = last_node.shape
         last_dim, output_dim = len(last_shape), len(self.output_shape)
 
@@ -119,20 +122,20 @@ class Interpreter:
 
         # Add node that projects to the output shape. Need matrix. Result should be batch, output_shape[-1]
         weights = torch.randn(last_shape[-1], self.output_shape[-1], requires_grad=True, device=self.device)
-        self.stacks['params'].append(weights)
+        self.net['params'].append(weights)
 
         node = Node(
             shape=utils.mult_shape(last_node.shape, weights.shape),
             layer=last_node.layer + 1,
             fn=torch.matmul,
             parents=[last_node],
-            weight_id=len(self.stacks['params'])-1,
+            weight_id=len(self.net['params'])-1,
             desc="Matmul"
         )
 
         dag.add_edge(last_node, node)
 
-        # Prune all nodes that aren't in the path of the output layer
+        # Prune all nodes that aren't in the path of the output layer. This is crucial. Forward pass can fail if we don't do this.
         dag.prune(node)
 
         # TODO: Add support for activation functions

@@ -13,6 +13,7 @@ ADD_RATE = 0.18
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 
 # TODO: Take random genomes and run UMAD a bunch just to see what happens. Neutral landscapes?
+# TODO: Have int equal probability of adding small ints and a larger range?
 
 class Genome:
     '''Genome of a Push Program'''
@@ -117,19 +118,6 @@ class Population:
                     new_genome = copy.deepcopy(genome)
                     new_population.append(new_genome)
                 # Update the population
-                self.population = new_population
-            case 'elite':
-                new_population = []
-                for i in range(size):
-                    # Make deep copies of the top genomes
-                    new_genome = copy.deepcopy(self.population[i])
-                    new_population.append(new_genome)
-                # Fill the rest of the population with mutated copies
-                while len(new_population) < self.size:
-                    genome = random.choice(new_population)
-                    new_genome = copy.deepcopy(genome)
-                    new_genome.UMAD()
-                    new_population.append(new_genome)
                 self.population = new_population
 
         # Mutate the new population
