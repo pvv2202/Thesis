@@ -24,17 +24,13 @@ class Network:
             node = queue.popleft()
             queue.extend(self.dag.graph[node]) # Add children to queue
             node.execute(self.params, self.device) # Execute the function at node
-            if node.shape != node.tensor.shape:
-                print(f"Node: {node.desc}")
-                print(f"Expected Shape: {node.shape}")
-                print(f"Actual Shape: {node.tensor.shape}")
             out = node
 
         if len(out.tensor.shape) > 2:
             print("Output too big")
             return None
 
-        return out.tensor # Output node will always come last since we step layer by layer
+        return out.tensor # Output node will always come last since we step layer by layer and prune
 
     def loss(self, y_pred, y, loss=torch.nn.functional.cross_entropy):
         '''Calculate loss'''
