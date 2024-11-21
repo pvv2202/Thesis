@@ -41,7 +41,7 @@ class Instructions:
             return
 
         # Pop the top node and integer from the stack
-        pop_node = stacks['node'].pop()
+        pop_node = stacks['node'].popleft()
         pop_int = stacks['int'].pop()
 
         # Calculate new dimension
@@ -72,19 +72,6 @@ class Instructions:
         stacks['node'].append(node)
 
     @staticmethod
-    def matmul_dup(dag, stacks, device):
-        '''Matrix Multiplication with Duplicate'''
-        # Check if there are enough nodes and ints in the stack
-        if len(stacks['node']) < 1 or len(stacks['int']) < 1:
-            return
-        # Get the top node from the stack
-        pop_node = stacks['node'][-1]
-        # Call matmul
-        Instructions.matmul(dag, stacks, device)
-        # Add top node back
-        stacks['node'].append(pop_node)
-
-    @staticmethod
     def matmul_stack(dag, stacks):
         '''Matrix Multiplication with Top 2 From Stack'''
         # Do nothing if there aren't enough nodes in the stack
@@ -92,12 +79,12 @@ class Instructions:
             return
 
         # If not multiplicable, return (noop)
-        if not utils.multable(stacks['node'][-1].shape, stacks['node'][-2].shape):
+        if not utils.multable(stacks['node'][0].shape, stacks['node'][1].shape):
             return
 
         # Pop the top 2 nodes from the stack
-        pop_node1 = stacks['node'].pop()
-        pop_node2 = stacks['node'].pop()
+        pop_node1 = stacks['node'].popleft()
+        pop_node2 = stacks['node'].popleft()
 
         # Create new node
         node = Node (
@@ -129,15 +116,15 @@ class Instructions:
             return
 
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
-        if len(stacks['node'][-1].shape) < 4:
+        if len(stacks['node'][0].shape) < 4:
             return
 
         # Check if maxpooling is possible.
-        if not utils.conv2dable(stacks['node'][-1].shape, (stacks['node'][-1].shape[1], stacks['node'][-1].shape[1], 2, 2), stride=2):
+        if not utils.conv2dable(stacks['node'][0].shape, (stacks['node'][0].shape[1], stacks['node'][0].shape[1], 2, 2), stride=2):
             return
 
         # Pop the top node from the stack
-        pop_node = stacks['node'].pop()
+        pop_node = stacks['node'].popleft()
 
         # Create new node
         node = Node(
@@ -164,11 +151,11 @@ class Instructions:
             return
 
         # Ensure top node has more than 1 dimension
-        if len(stacks['node'][-1].shape) < 2:
+        if len(stacks['node'][0].shape) < 2:
             return
 
         # Pop the top node from the stack
-        pop_node = stacks['node'].pop()
+        pop_node = stacks['node'].popleft()
         last_shape = pop_node.shape
 
         prod = 1
@@ -198,17 +185,17 @@ class Instructions:
         if len(stacks['node']) < 1 or len(stacks['int']) < 2:
             return
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
-        if len(stacks['node'][-1].shape) < 4:
+        if len(stacks['node'][0].shape) < 4:
             return
         # Check if kernel size is valid
-        if stacks['int'][-1] > stacks['node'][-1].shape[-1] or stacks['int'][-1] > stacks['node'][-1].shape[-2]:
+        if stacks['int'][-1] > stacks['node'][0].shape[-1] or stacks['int'][-1] > stacks['node'][0].shape[-2]:
             return
         # If we can't convolve, just return
-        if not utils.conv2dable(stacks['node'][-1].shape, (stacks['int'][-2], stacks['node'][-1].shape[1], stacks['int'][-1], stacks['int'][-1])):
+        if not utils.conv2dable(stacks['node'][0].shape, (stacks['int'][-2], stacks['node'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
             return
 
         # Pop the top node, kernel size, and number of filters from the stack
-        pop_node = stacks['node'].pop()
+        pop_node = stacks['node'].popleft()
         kernel_size = stacks['int'].pop()
         num_filters = stacks['int'].pop()
 
@@ -245,7 +232,7 @@ class Instructions:
             return
 
         # Pop the top node from the stack
-        pop_node = stacks['node'].pop()
+        pop_node = stacks['node'].popleft()
 
         # Create weights of same shape as popped node
         weights = torch.randn(pop_node.shape, requires_grad=True, device=device)
@@ -272,12 +259,12 @@ class Instructions:
             return
 
         # If not addable, return (noop)
-        if not utils.addable(stacks['node'][-1].shape, stacks['node'][-2].shape):
+        if not utils.addable(stacks['node'][0].shape, stacks['node'][1].shape):
             return
 
         # Pop the top 2 nodes from the stack
-        pop_node1 = stacks['node'].pop()
-        pop_node2 = stacks['node'].pop()
+        pop_node1 = stacks['node'].popleft()
+        pop_node2 = stacks['node'].popleft()
 
         # Create new node
         node = Node (
@@ -296,18 +283,16 @@ class Instructions:
 
         stacks['node'].append(node)
 
+    #########################
+    ####### Stack Ops #######
+    #########################
+
     @staticmethod
-    def mat_add_dup(dag, stacks, device):
-        '''Matrix Addition with Duplicate'''
-        # Check if there are enough nodes in the stack
+    def dup(stacks):
+        '''Duplicate the top node on the node queue'''
         if len(stacks['node']) < 1:
             return
-        # Get the top node from the stack
-        pop_node = stacks['node'][-1]
-        # Call mat_add
-        Instructions.mat_add(dag, stacks, device)
-        # Add top node back
-        stacks['node'].append(pop_node)
+        stacks['node'].append(stacks['node'][0])
 
     #########################
     ###### PyTorch Ops ######
@@ -321,7 +306,7 @@ class Instructions:
             return
 
         # Pop the top node from the stack
-        pop_node = stacks['node'].pop()
+        pop_node = stacks['node'].popleft()
 
         # Create new node
         node = Node(
@@ -372,7 +357,7 @@ class Instructions:
     #         return
     #
     #     # Pop the top node and int from the stack
-    #     pop_node = stacks['node'].pop()
+    #     pop_node = stacks['node'].popleft()
     #
     #     # Create new node
     #     node = Node(

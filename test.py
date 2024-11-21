@@ -35,7 +35,8 @@ if __name__ == "__main__":
 
     '''Testing for matmul_stack'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
-    # genome.genome = ['flatten', 'flatten', 'relu', 213, 238, 185, 'matmul', 245, 32, 209, 'flatten', 'sigmoid', 'mat_add_stack', 'flatten', 47, 166, 'matmul_dup', 'mat_add_dup', 'matmul_dup', 153, 115, 'mat_add_stack', 'matmul_stack', 248]
+    # genome.genome = [99, 121, 'sigmoid', 'dup', 'mat_add', 97, 166, 16, 108, 'conv2d', 36, 'normalize', 'dup', 'maxpool2d', 'relu', 218, 129, 215, 139, 10, 'matmul_stack', 212, 'flatten', 'conv2d']
+    #
     # network = genome.transcribe()
     # print(network)
     # network.fit(epochs=1)
@@ -43,4 +44,10 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
-   
+    pop = gp.Population(size=5, num_initial_genes=25, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop.run(generations=50, epochs=1)
+
+    for genome in pop.population:
+        print(genome.fitness)
+        print(genome.genome)
+        print("")
