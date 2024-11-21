@@ -7,8 +7,7 @@ import random
 import torch
 import copy
 
-# TODO: Probably change this primes thing
-PRIMES = [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 4, 8, 16, 32, 64, 128] # Fundamental Theorem of Arithmetic
+INT_RANGE = (1, 256)
 FLOAT_RANGE = (0.0, 1.0)
 ADD_RATE = 0.18
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
@@ -45,7 +44,7 @@ class Genome:
 
         match type:
             case 0:
-                return random.choice(PRIMES)  # Random int
+                return random.randint(*INT_RANGE) # Random integer
             case 1:
                 return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
             case 2:
@@ -100,8 +99,7 @@ class Population:
     def tournament(self, size):
         '''Selects the best genome from a tournament of size size'''
         tournament = random.sample(self.population, size)
-        tournament.sort(key=lambda x: x.fitness)
-        return tournament[0]
+        return tournament[-1]
 
     def forward_generation(self, method='tournament', size=5):
         '''Moves the population forward one generation'''

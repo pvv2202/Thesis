@@ -36,6 +36,7 @@ class Interpreter:
 
     def read_genome(self, genome):
         '''Reads the genome and processes it into stacks'''
+        print(genome)
         for gene in genome:
             if type(gene) == int:
                 self.stacks['int'].append(gene)
@@ -66,8 +67,6 @@ class Interpreter:
                     print(parent.shape)
 
         self.add_output(dag) # Add output layer
-
-        # TODO: We can prune the DAG by just removing any leaves layer-by-layer that aren't in the path of the output layer
 
         # Create network
         network = Network(
@@ -127,14 +126,14 @@ class Interpreter:
             layer=last_node.layer + 1,
             fn=torch.matmul,
             parents=[last_node],
-            weight_id=len(self.stacks['params']) - 1,
+            weight_id=len(self.stacks['params'])-1,
             desc="Matmul"
         )
 
         dag.add_edge(last_node, node)
 
         # Prune all nodes that aren't in the path of the output layer
-        dag.prune(node)
+        # dag.prune(node)
 
         # TODO: Add support for activation functions
         # last_node = node
