@@ -1,6 +1,6 @@
 import torch
-
 import utils
+from collections import deque
 from instructions import Instructions
 from dag import *
 from utils import *
@@ -13,7 +13,7 @@ class Interpreter:
             'int': [], # Really just Natural numbers
             'float': [],
             'bool': [],
-            'node': [],
+            'node': deque([]),
             'str': [],
             'exec': [], # Contains the instructions
 
@@ -81,7 +81,7 @@ class Interpreter:
     def add_output(self, dag):
         '''Adds the output layer to the DAG, There should always be at least 1 node in the stack'''
         # Get the last node in the stack
-        last_node = self.stacks['node'].pop()
+        last_node = self.stacks['node'].popleft()
         last_shape = last_node.shape
         last_dim, output_dim = len(last_shape), len(self.output_shape)
 
@@ -133,7 +133,7 @@ class Interpreter:
         dag.add_edge(last_node, node)
 
         # Prune all nodes that aren't in the path of the output layer
-        # dag.prune(node)
+        dag.prune(node)
 
         # TODO: Add support for activation functions
         # last_node = node

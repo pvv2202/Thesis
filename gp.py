@@ -21,10 +21,10 @@ class Genome:
         self.fitness = 0
         self.train = train
         self.test = test
+        self.activation = activation
         self.network = None
 
-        # Initialize interpreter, instructions
-        self.interpreter = Interpreter(train, test, activation) # Pass shapes to interpreter
+        # Initialize instructions
         self.instructions = Instructions()
 
     def random_index(self):
@@ -83,8 +83,9 @@ class Genome:
 
     def transcribe(self):
         '''Transcribes the genome to create a network. Returns the network'''
-        self.interpreter.read_genome(self.genome)
-        self.network = self.interpreter.run()
+        interpreter = Interpreter(self.train, self.test, self.activation) # Pass shapes to interpreter
+        interpreter.read_genome(self.genome)
+        self.network = interpreter.run()
         return self.network
 
 class Population:
@@ -97,34 +98,41 @@ class Population:
             genome.initialize_random(num_initial_genes)
 
     def tournament(self, size):
-        '''Selects the best genome from a tournament of size size'''
+        '''Selects the best genome from a tournament with size individuals'''
         tournament = random.sample(self.population, size)
-        return tournament[-1]
+        return max(tournament, key=lambda x: x.fitness)
 
     def forward_generation(self, method='tournament', size=5):
         '''Moves the population forward one generation'''
-        # Sort the population by fitness. Right now fitness is loss, so lower is better
-        self.population.sort(key=lambda x: x.fitness)
+        # Sort the population by fitness. Higher fitness is better
+        self.population.sort(key=lambda x: x.fitness, reverse=True)
         print([genome.fitness for genome in self.population])
-
-        # TODO: Implement a better selection algorithm. Don't select on the basis of a single number
-        # TODO: Probably select on a lexicase-like combination of things. Scale for specific examples
-        # TODO: Look into historically-assessed hardware. Think about epsilon. Median absolute deviation from median.
-        # TODO: All errors on a case. calcualte different epsilon for each case. Take median error on a case, and calculate
-        # TODO: Everybody's deviation from that median error. Take median of those and use that as epsilon.
-        # TODO: Population of 100, evaluate them. Make the next generation. Starts empty. Select a parent (or two) for each slot
-        # TODO: Do this all the way
 
         match method:
             case 'tournament':
                 new_population = []
                 for _ in range(self.size):
-                    new_population.append(self.tournament(size))
+                    # Select a genome and make a deep copy
+                    genome = self.tournament(size)
+                    new_genome = copy.deepcopy(genome)
+                    new_population.append(new_genome)
+                # Update the population
+                self.population = new_population
             case 'elite':
+                new_population = []
                 for i in range(size):
-                    self.population[i] = copy.deepcopy(self.population[-(i+1)])
+                    # Make deep copies of the top genomes
+                    new_genome = copy.deepcopy(self.population[i])
+                    new_population.append(new_genome)
+                # Fill the rest of the population with mutated copies
+                while len(new_population) < self.size:
+                    genome = random.choice(new_population)
+                    new_genome = copy.deepcopy(genome)
+                    new_genome.UMAD()
+                    new_population.append(new_genome)
+                self.population = new_population
 
-        # Mutate everything
+        # Mutate the new population
         for genome in self.population:
             genome.UMAD()
 
