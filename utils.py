@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 
 # TODO: Create tests for these functions
@@ -155,5 +154,11 @@ def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
 
     # Return the output shape (batch/channel are the same)
     return (matrix_shape[0], c_ko, h_out, w_out)
+
+def median_absolute_deviation(data):
+    """Calculate the Median Absolute Deviation (MAD)."""
+    median = np.median(data)
+    deviations = np.abs(data - median)
+    return np.median(deviations)
 
 

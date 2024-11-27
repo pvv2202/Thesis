@@ -1,8 +1,9 @@
 from keras.src.metrics.accuracy_metrics import accuracy
-
+from utils import median_absolute_deviation
 from interpreter import Interpreter
 from instructions import Instructions
 import matplotlib.pyplot as plt
+import numpy as np
 import random
 import torch
 import copy
@@ -119,6 +120,9 @@ class Population:
                     new_population.append(new_genome)
                 # Update the population
                 self.population = new_population
+            case 'epsilon_lexicase':
+                pass
+                # TODO: Take random sample of test cases and evaluate on them. Maybe need to rethink how testing/evaluation works. Could also cache results on tests for each run?
 
         # Mutate the new population
         for genome in self.population:
