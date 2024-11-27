@@ -44,8 +44,8 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
-    pop = gp.Population(size=50, num_initial_genes=25,    train=train_loader, test=test_loader, activation=torch.softmax)
-    pop.run(generations=30, epochs=1)
+    pop = gp.Population(size=50, num_initial_genes=20, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop.run(generations=50, epochs=1)
 
     for genome in pop.population:
         print(genome.fitness)
