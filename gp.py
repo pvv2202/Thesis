@@ -25,6 +25,7 @@ class Genome:
         self.test = test
         self.activation = activation
         self.network = None
+        self.results = None
 
         # Initialize instructions
         self.instructions = Instructions()
@@ -94,6 +95,8 @@ class Population:
     '''Population of Push Program Genomes'''
     def __init__(self, size, num_initial_genes, train, test, activation=torch.softmax):
         self.size = size
+        self.train = train
+        self.test = test
         self.population = [Genome(train, test, activation) for _ in range(size)]
         # Initialize the population with random genes
         for genome in self.population:
@@ -104,7 +107,39 @@ class Population:
         tournament = random.sample(self.population, size)
         return max(tournament, key=lambda x: x.fitness)
 
-    def forward_generation(self, method='tournament', size=5):
+    def epsilon_lexicase(self, candidates, round, max_rounds):
+        '''Selects the best genome using epsilon lexicase selection'''
+        # Randomly select a test case
+        test = random.choice(self.train)
+        # Randomly select whether to use loss or accuracy
+        metric = random.choice([0, 1])
+
+        # Get the results for the test case
+        test_results = [genome.results[test][metric] for genome in candidates] # Results of the form total loss, percent accuracy
+
+        # Calculate the median and median absolute deviation (MAD)
+        median = np.median(test_results)
+        mad = median_absolute_deviation(test_results)
+
+        # Define epsilon as a range around the median
+        epsilon = 2 * mad
+        lower_bound = median - epsilon
+        upper_bound = median + epsilon
+
+        # Get the fitness of each genome on the test case
+        next = [genome for genome in candidates if lower_bound <= genome.results[test][metric] <= upper_bound]
+
+        # If no genomes pass, fallback to the best genome based on the test case
+        if not next:
+            return max(self.population, key=lambda genome: genome.results[test][metric])
+
+        if len(next) == 1:
+            return next[0]
+        else:
+            # Randomly select from passing genomes unless we're on the max rounds at which point just return a random one
+            return self.epsilon_lexicase(next, round + 1, max_rounds) if round < max_rounds else random.choice(next)
+
+    def forward_generation(self, method='tournament', size=5, max_rounds=5):
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Higher fitness is better
         self.population.sort(key=lambda x: x.fitness, reverse=True)
@@ -121,8 +156,14 @@ class Population:
                 # Update the population
                 self.population = new_population
             case 'epsilon_lexicase':
-                pass
-                # TODO: Take random sample of test cases and evaluate on them. Maybe need to rethink how testing/evaluation works. Could also cache results on tests for each run?
+                new_population = []
+                for _ in range(self.size):
+                    # Select a genome and make a deep copy. We pass results and a random sample of the population
+                    genome = self.epsilon_lexicase(random.sample(self.population, size), 1, max_rounds)
+                    new_genome = copy.deepcopy(genome)
+                    new_population.append(new_genome)
+                # Update the population
+                self.population = new_population
 
         # Mutate the new population
         for genome in self.population:
@@ -136,6 +177,7 @@ class Population:
         for gen_num in range(1, generations + 1):
             gen_acc = []
             gen_size = []
+            gen_results = {}
             for genome in self.population:
                 gen_size.append(len(genome.genome))
                 network = genome.transcribe()
@@ -144,8 +186,9 @@ class Population:
                 network.fit(epochs=epochs)
 
                 # Evaluate the network
-                loss, accuracy = network.evaluate()
+                loss, accuracy, results = network.evaluate()
                 genome.fitness = accuracy
+                genome.results = results
 
                 # Update best genome
                 if accuracy > best_genome[1]:
@@ -160,7 +203,7 @@ class Population:
             print(f"Generation {gen_num} Completed")
             print("--------------------------------------------------\n")
 
-            self.forward_generation(method='tournament', size=5)
+            self.forward_generation(method='epsilon-lexicase', size=10)
 
         print(f"Best genome: {best_genome[0].genome}")
 
