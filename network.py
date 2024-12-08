@@ -71,6 +71,8 @@ class Network:
         total_loss = 0
         test_sum = 0
 
+        results = {}
+
         for x, y in self.test:
             x, y = x.to(self.device), y.to(self.device)
             # Forward pass and compute
@@ -86,13 +88,15 @@ class Network:
 
                 # Calculate accuracy
                 _, predictions = torch.max(y_pred, -1) # Should always be last dimension
+
                 correct_predictions += (predictions == y).sum().item()
+                results[x] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
 
         # Calculate accuracy
         accuracy = correct_predictions / test_sum
         print(f'Test set: Loss: {total_loss / len(self.test)}, Accuracy: {accuracy * 100:.2f}%')
 
-        return total_loss, accuracy
+        return total_loss, accuracy, results
 
     def __str__(self):
         return self.dag.__str__()
