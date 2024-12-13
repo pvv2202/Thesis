@@ -32,6 +32,15 @@ class Interpreter:
         # Get input/output shapes
         train_x, train_y = next(iter(train)) # Get example input/output
         self.input_shape = tuple(train_x.size())
+        batch_size = self.input_shape[0]
+        if train_y.ndim == 0: # Single value
+            self.output_shape = (1,)
+        elif train_y.ndim == 1: # Classification
+            num_classes = len(torch.unique(train_y))
+            self.output_shape = (batch_size, num_classes)
+        else: # Regression or multi-class/multi-label classification
+            self.output_shape = (batch_size, tuple(train_y.size()))
+
         self.output_shape = (64, 10) # TODO: This changes depending on loss function/task. Temporary fix
 
         # Initialize instructions

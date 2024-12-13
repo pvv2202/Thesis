@@ -4,20 +4,41 @@ import gp
 import torch
 
 if __name__ == "__main__":
+    '''MNIST'''
+    # # Define the transformation to apply to each image (convert to tensor and normalize)
+    # transform = transforms.Compose([transforms.ToTensor(),
+    #                                 transforms.Normalize((0.5,), (0.5,))])
+    #
+    # # Find device
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #
+    # # Load the MNIST training and test datasets
+    # train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    # test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    #
+    # #TODO: Right now, this requires fixed batch sizes. Ideally, it should be able to handle variable batch sizes. Network object could take a "batch" field
+    # # Create data loaders for batching
+    # train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True) # drop_last=True to ensure all batches are the same size
+    # test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True) # drop_last=True to ensure all batches are the same size
+
+    '''CIFAR10'''
     # Define the transformation to apply to each image (convert to tensor and normalize)
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize((0.5,), (0.5,))])
+    # CIFAR-10 images are RGB (3 channels), so normalization should be applied across all 3 channels
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize R, G, B channels
+    ])
 
     # Find device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load the MNIST training and test datasets
-    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    # Load the CIFAR-10 training and test datasets
+    train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 
     # Create data loaders for batching
-    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True) # drop_last=True to ensure all batches are the same size
-    test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True) # drop_last=True to ensure all batches are the same size
+    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True)  # drop_last=True to ensure all batches are the same size
+    test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True)  # drop_last=True to ensure all batches are the same size
 
     '''Example Network That Performs Well on MNIST'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
@@ -44,10 +65,10 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
-    pop = gp.Population(size=30, num_initial_genes=10, train=train_loader, test=test_loader, activation=torch.softmax)
-    pop.run(generations=100, epochs=1)
+    pop = gp.Population(size=30, num_initial_genes=25, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop.run(generations=50, epochs=2, method='epsilon_lexicase', pool_size=5)
 
-    for genome in pop.population:
+    for genome in pop.population:    
         print(genome.fitness)
         print(genome.genome)
         print("")

@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 # TODO: Create tests for these functions
 
