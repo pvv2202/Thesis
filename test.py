@@ -65,10 +65,10 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
-    pop = gp.Population(size=30, num_initial_genes=25, train=train_loader, test=test_loader, activation=torch.softmax)
-    pop.run(generations=50, epochs=2, method='epsilon_lexicase', pool_size=5)
+    pop = gp.Population(size=25, num_initial_genes=50, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop.run(generations=75, epochs=2, method='epsilon-lexicase', pool_size=8)
 
-    for genome in pop.population:    
+    for genome in pop.population:
         print(genome.fitness)
         print(genome.genome)
         print("")

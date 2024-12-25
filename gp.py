@@ -163,7 +163,7 @@ class Population:
                 new_population = []
                 for _ in range(self.size):
                     # Select a genome and make a deep copy. We pass results and a random sample of the population
-                    genome = self.epsilon_lexicase(random.sample(self.population, size), 1, max_rounds)
+                    genome = self.epsilon_lexicase(self.population, 1, max_rounds)
                     new_genome = copy.deepcopy(genome)
                     new_population.append(new_genome)
                 # Update the population
@@ -216,37 +216,41 @@ class Population:
         labels = [i for i in range(1, generations + 1)]
 
         # Create box plot for size
+        plt.figure(figsize=(10, 6))  # Adjust width and height as needed
         size_plot = plt.boxplot(size,
-                          vert=True,
-                          patch_artist=True,
-                          labels=labels,
-                          showmeans=True,
-                          meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
-                          medianprops=dict(color='blue'),
-                          whiskerprops=dict(color='black'),
-                          capprops=dict(color='black'),
-                          boxprops=dict(facecolor='lavender', color='black'),
-                          flierprops=dict(markerfacecolor='green', marker='D'))
+                                vert=True,
+                                patch_artist=True,
+                                labels=labels,
+                                showmeans=True,
+                                meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
+                                medianprops=dict(color='blue'),
+                                whiskerprops=dict(color='black'),
+                                capprops=dict(color='black'),
+                                boxprops=dict(facecolor='lavender', color='black'),
+                                flierprops=dict(markerfacecolor='green', marker='D'))
 
         plt.title('Box Plot of Size Over Generations')
         plt.xlabel('Generation')
         plt.ylabel('Size (Number of Genes)')
+        plt.tight_layout()  # Automatically adjusts layout to fit elements
         plt.show()
 
         # Create box plot for accuracy
+        plt.figure(figsize=(10, 6))  # Adjust width and height as needed
         acc_plot = plt.boxplot(acc,
-                          vert=True,
-                          patch_artist=True,
-                          labels=labels,
-                          showmeans=True,
-                          meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
-                          medianprops=dict(color='blue'),
-                          whiskerprops=dict(color='black'),
-                          capprops=dict(color='black'),
-                          boxprops=dict(facecolor='lavender', color='black'),
-                          flierprops=dict(markerfacecolor='green', marker='D'))
+                               vert=True,
+                               patch_artist=True,
+                               labels=labels,
+                               showmeans=True,
+                               meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
+                               medianprops=dict(color='blue'),
+                               whiskerprops=dict(color='black'),
+                               capprops=dict(color='black'),
+                               boxprops=dict(facecolor='lavender', color='black'),
+                               flierprops=dict(markerfacecolor='green', marker='D'))
 
         plt.title('Box Plot of Accuracy Over Generations')
         plt.xlabel('Generation')
         plt.ylabel('Accuracy')
+        plt.tight_layout()  # Automatically adjusts layout to fit elements
         plt.show()
