@@ -1,4 +1,3 @@
-from keras.src.metrics.accuracy_metrics import accuracy
 from utils import median_absolute_deviation
 from interpreter import Interpreter
 from instructions import Instructions
@@ -109,13 +108,15 @@ class Population:
 
     def epsilon_lexicase(self, candidates, round, max_rounds):
         '''Selects the best genome using epsilon lexicase selection'''
-        # Randomly select a test case
-        test = random.choice(self.train)
-        # Randomly select whether to use loss or accuracy
-        metric = random.choice([0, 1])
+        # Choose a random test case
+        batch = random.randint(0, len(self.test) - 1)
+
+        # Randomly select whether to use loss (0) or accuracy (1)
+        # metric = random.choice([0, 1]) # TODO: Temporarily just using accuracy
+        metric = 1
 
         # Get the results for the test case
-        test_results = [genome.results[test][metric] for genome in candidates] # Results of the form total loss, percent accuracy
+        test_results = [genome.results[batch][metric] for genome in candidates] # Results of the form total loss, percent accuracy
 
         # Calculate the median and median absolute deviation (MAD)
         median = np.median(test_results)
@@ -127,11 +128,14 @@ class Population:
         upper_bound = median + epsilon
 
         # Get the fitness of each genome on the test case
-        next = [genome for genome in candidates if lower_bound <= genome.results[test][metric] <= upper_bound]
+        next = [genome for genome in candidates if lower_bound <= genome.results[batch][metric] <= upper_bound]
 
         # If no genomes pass, fallback to the best genome based on the test case
         if not next:
-            return max(self.population, key=lambda genome: genome.results[test][metric])
+            if metric == 0:
+                return min(self.population, key=lambda genome: genome.results[batch][metric])
+            if metric == 1:
+                return max(self.population, key=lambda genome: genome.results[batch][metric])
 
         if len(next) == 1:
             return next[0]
@@ -143,7 +147,7 @@ class Population:
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Higher fitness is better
         self.population.sort(key=lambda x: x.fitness, reverse=True)
-        print([genome.fitness for genome in self.population])
+        print([genome.fitness[1] for genome in self.population]) # Should print accuracy
 
         match method:
             case 'tournament':
@@ -159,7 +163,7 @@ class Population:
                 new_population = []
                 for _ in range(self.size):
                     # Select a genome and make a deep copy. We pass results and a random sample of the population
-                    genome = self.epsilon_lexicase(random.sample(self.population, size), 1, max_rounds)
+                    genome = self.epsilon_lexicase(self.population, 1, max_rounds)
                     new_genome = copy.deepcopy(genome)
                     new_population.append(new_genome)
                 # Update the population
@@ -169,7 +173,7 @@ class Population:
         for genome in self.population:
             genome.UMAD()
 
-    def run(self, generations, epochs):
+    def run(self, generations, epochs, method='tournament', pool_size=5):
         '''Runs the population on the train and test data'''
         acc = []
         size = []
@@ -187,15 +191,16 @@ class Population:
 
                 # Evaluate the network
                 loss, accuracy, results = network.evaluate()
-                genome.fitness = accuracy
+                genome.fitness = (loss, accuracy)
                 genome.results = results
 
                 # Update best genome
                 if accuracy > best_genome[1]:
                     best_genome = (genome, accuracy)
 
-                gen_acc.append(genome.fitness)
-                print(f"Genome fitness: {genome.fitness}")
+                gen_acc.append(accuracy)
+                print(f"Genome Accuracy: {accuracy}")
+                print(f"Genome Loss: {loss}")
             acc.append(gen_acc)
             size.append(gen_size)
 
@@ -203,7 +208,7 @@ class Population:
             print(f"Generation {gen_num} Completed")
             print("--------------------------------------------------\n")
 
-            self.forward_generation(method='epsilon-lexicase', size=10)
+            self.forward_generation(method=method, size=pool_size)
 
         print(f"Best genome: {best_genome[0].genome}")
 
@@ -211,37 +216,41 @@ class Population:
         labels = [i for i in range(1, generations + 1)]
 
         # Create box plot for size
+        plt.figure(figsize=(10, 6))  # Adjust width and height as needed
         size_plot = plt.boxplot(size,
-                          vert=True,
-                          patch_artist=True,
-                          labels=labels,
-                          showmeans=True,
-                          meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
-                          medianprops=dict(color='blue'),
-                          whiskerprops=dict(color='black'),
-                          capprops=dict(color='black'),
-                          boxprops=dict(facecolor='lavender', color='black'),
-                          flierprops=dict(markerfacecolor='green', marker='D'))
+                                vert=True,
+                                patch_artist=True,
+                                labels=labels,
+                                showmeans=True,
+                                meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
+                                medianprops=dict(color='blue'),
+                                whiskerprops=dict(color='black'),
+                                capprops=dict(color='black'),
+                                boxprops=dict(facecolor='lavender', color='black'),
+                                flierprops=dict(markerfacecolor='green', marker='D'))
 
         plt.title('Box Plot of Size Over Generations')
         plt.xlabel('Generation')
         plt.ylabel('Size (Number of Genes)')
+        plt.tight_layout()  # Automatically adjusts layout to fit elements
         plt.show()
 
         # Create box plot for accuracy
+        plt.figure(figsize=(10, 6))  # Adjust width and height as needed
         acc_plot = plt.boxplot(acc,
-                          vert=True,
-                          patch_artist=True,
-                          labels=labels,
-                          showmeans=True,
-                          meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
-                          medianprops=dict(color='blue'),
-                          whiskerprops=dict(color='black'),
-                          capprops=dict(color='black'),
-                          boxprops=dict(facecolor='lavender', color='black'),
-                          flierprops=dict(markerfacecolor='green', marker='D'))
+                               vert=True,
+                               patch_artist=True,
+                               labels=labels,
+                               showmeans=True,
+                               meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
+                               medianprops=dict(color='blue'),
+                               whiskerprops=dict(color='black'),
+                               capprops=dict(color='black'),
+                               boxprops=dict(facecolor='lavender', color='black'),
+                               flierprops=dict(markerfacecolor='green', marker='D'))
 
         plt.title('Box Plot of Accuracy Over Generations')
         plt.xlabel('Generation')
         plt.ylabel('Accuracy')
+        plt.tight_layout()  # Automatically adjusts layout to fit elements
         plt.show()
