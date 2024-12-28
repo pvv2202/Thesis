@@ -6,6 +6,7 @@ import numpy as np
 import random
 import torch
 import copy
+import pickle
 
 INT_RANGE = (1, 256)
 FLOAT_RANGE = (0.0, 1.0)
@@ -101,6 +102,20 @@ class Population:
         for genome in self.population:
             genome.initialize_random(num_initial_genes)
 
+    def save(self, filename):
+        '''Saves the population to a file.'''
+        with open(filename, 'wb') as file:
+            pickle.dump(self, file)
+        print(f"Population saved to {filename}")
+
+    @staticmethod
+    def load(filename):
+        '''Loads a population from a file.'''
+        with open(filename, 'rb') as file:
+            population = pickle.load(file)
+        print(f"Population loaded from {filename}")
+        return population
+
     def tournament(self, size):
         '''Selects the best genome from a tournament with size individuals'''
         tournament = random.sample(self.population, size)
@@ -181,7 +196,6 @@ class Population:
         for gen_num in range(1, generations + 1):
             gen_acc = []
             gen_size = []
-            gen_results = {}
             for genome in self.population:
                 gen_size.append(len(genome.genome))
                 network = genome.transcribe()

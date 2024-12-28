@@ -2,6 +2,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import gp
 import torch
+from gp import Population
 
 if __name__ == "__main__":
     '''MNIST'''
@@ -68,7 +69,9 @@ if __name__ == "__main__":
     # print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
+    # pop = Population.load("pop.pkl")
     pop = gp.Population(size=25, num_initial_genes=50, train=train_loader, test=test_loader, activation=torch.softmax)
+    # pop.save("pop.pkl")
     pop.run(generations=25, epochs=1, method='tournament', pool_size=8)
 
     for genome in pop.population:
