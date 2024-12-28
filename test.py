@@ -37,8 +37,8 @@ if __name__ == "__main__":
     test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 
     # Create data loaders for batching
-    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True)  # drop_last=True to ensure all batches are the same size
-    test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True)  # drop_last=True to ensure all batches are the same size
+    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)  # drop_last=True to ensure all batches are the same size
+    test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False)  # drop_last=True to ensure all batches are the same size
 
     '''Example Network That Performs Well on MNIST'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
@@ -54,10 +54,13 @@ if __name__ == "__main__":
     # genome.fitness = network.fit(epochs=20)
     # print(f"Genome fitness: {genome.fitness}")
 
-    '''Testing for matmul_stack'''
+    '''Example Network That Performs Well on CIFAR-10'''
+    #genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
+
+    '''Individual Tests'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
+    # genome.genome = [74, 183, 'sigmoid', 'maxpool2d', 'mat_add_nodes', 210, 'sigmoid', 'normalize', 'matmul_nodes', 86, 'normalize', 97, 'sigmoid', 'flatten', 'relu', 'matmul', 220, 'matmul_nodes', 'sigmoid', 250, 200, 'flatten', 'matmul_nodes', 'normalize', 256, 'normalize', 232, 'mat_add', 'maxpool2d', 19, 'dup', 235, 190, 183, 'mat_add_nodes', 'flatten', 'conv2d', 'dup', 70, 'relu', 'flatten', 'relu', 'sigmoid', 150, 'relu', 'mat_add_nodes', 'maxpool2d', 'relu', 'dup', 'normalize']
     # genome.genome = [99, 121, 'sigmoid', 'dup', 'mat_add', 97, 166, 16, 108, 'conv2d', 36, 'normalize', 'dup', 'maxpool2d', 'relu', 218, 129, 215, 139, 10, 'matmul_stack', 212, 'flatten', 'conv2d']
-    #
     # network = genome.transcribe()
     # print(network)
     # network.fit(epochs=1)

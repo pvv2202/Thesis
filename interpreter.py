@@ -31,17 +31,15 @@ class Interpreter:
 
         # Get input/output shapes
         train_x, train_y = next(iter(train)) # Get example input/output
-        self.input_shape = tuple(train_x.size())
+        self.input_shape = tuple(train_x.size()[1:])
         batch_size = self.input_shape[0]
         if train_y.ndim == 0: # Single value
             self.output_shape = (1,)
         elif train_y.ndim == 1: # Classification
             num_classes = len(torch.unique(train_y))
-            self.output_shape = (batch_size, num_classes)
+            self.output_shape = (num_classes,)
         else: # Regression or multi-class/multi-label classification
-            self.output_shape = (batch_size, tuple(train_y.size()))
-
-        self.output_shape = (64, 10) # TODO: This changes depending on loss function/task. Temporary fix
+            self.output_shape = tuple(train_y.size())
 
         # Initialize instructions
         self.instructions = Instructions()
@@ -99,6 +97,7 @@ class Interpreter:
 
         if last_dim < output_dim:
             # If last_dim < output_dim, we need project it up to the output dim.
+            print("HERE")
             for _ in range(output_dim - last_dim):
                 # Add a node that unsqueezes the last dimension to the dag.
                 node = Node(
@@ -113,14 +112,12 @@ class Interpreter:
         elif last_dim > output_dim:
             # TODO: If output_dim is 2/3D + batch, this won't work. I guess for now assume it won't be? There are ways to do this
             # If last_dim > output_dim, Add a node that flattens the last dimension. Flatten ignores the batch dimension.
-            prev_batch = last_shape[0]
             prod = 1
-            for x in last_shape[1:]:
+            for x in last_shape:
                 prod *= x
-            last_shape = [prod]
 
             node = Node(
-                shape=(prev_batch, last_shape[-1]),
+                shape=(prod,),
                 layer=last_node.layer + 1,
                 fn=lambda x: torch.flatten(x, start_dim=1),
                 parents=[last_node],
@@ -129,7 +126,9 @@ class Interpreter:
             dag.add_edge(last_node, node)
             last_node = node
 
-        # Add node that projects to the output shape. Need matrix. Result should be batch, output_shape[-1]
+        last_shape = last_node.shape
+
+        # Add node that projects to the output shape. Need matrix. Result should be output_shape[-1]
         weights = torch.randn(last_shape[-1], self.output_shape[-1], requires_grad=True, device=self.device)
         self.net['params'].append(weights)
 

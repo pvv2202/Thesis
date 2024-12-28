@@ -2,6 +2,7 @@ import numpy as np
 import random
 
 # TODO: Create tests for these functions
+# TODO: Fix all of these now that batch isn't included in the shape
 
 def addable(shape1, shape2):
     '''
@@ -110,7 +111,7 @@ def batched_matmul_shape(shape1, shape2):
     if n1 != m2:
         return None
 
-    # Batch, channel dimensions
+    # Other dimensions if they exist
     batch_shape1 = shape1[:-2]
     batch_shape2 = shape2[:-2]
 
@@ -142,8 +143,8 @@ def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
     between a tensor of shape matrix and a kernel of shape kernel. Supports
     asymmetric kernels and matrices. Bias is added by default
     '''
-    # If the input is under 4D (batch, channel, h, w), or the kernel is not 3D (channel, h, w), we no-op
-    if len(matrix_shape) < 4 or len(kernel_shape) != 4:
+    # If the input is under 3D (channel, h, w), or the kernel is not 3D (channel, h, w), we no-op
+    if len(matrix_shape) < 3 or len(kernel_shape) != 3:
         return None
 
     h_in, w_in = matrix_shape[-2:]

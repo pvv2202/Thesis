@@ -39,27 +39,25 @@ class Instructions:
     def matmul(dag, net, stacks, device):
         '''Matrix Multiplication'''
         # Do nothing if there are no nodes or integers
-        if len(net['nodes']) < 1 or len(stacks['int']) < 1:
+        if len(net['nodes']) < 1 or len(stacks['int']) < 1 or len(net['nodes'][0].shape) < 1:
             return
 
-        # Pop the top node and integer from the stack
+        # Pop the top node from queue, top integer from the stack
         pop_node = net['nodes'].popleft()
         pop_int = stacks['int'].pop()
 
         # Calculate new dimension
         pop_shape = pop_node.shape
-        if len(pop_shape) < 2: # If less than 2, just make them the same (i.e. 1D tensor)
-            new_shape = pop_shape
-        else: # Otherwise, make the second to last dimension the same as the popped node's last dimension
-            new_shape = (pop_shape[-1], pop_int)
+        new_shape = (pop_shape[-1], pop_int)
 
         # Create weights
         weights = torch.randn(new_shape, requires_grad=True, device=device)
         net['params'].append(weights) # Add weights to the parameters stack
 
         # Create new node with the output shape of the matrix multiplication
+        shape = utils.mult_shape(pop_shape, new_shape)
         node = Node(
-            shape=utils.mult_shape(pop_shape, new_shape),
+            shape=shape,#utils.mult_shape(pop_shape, new_shape),
             layer=pop_node.layer + 1,
             fn=lambda x, y: torch.matmul(x, y),
             parents=[pop_node],
@@ -76,8 +74,8 @@ class Instructions:
     @staticmethod
     def matmul_nodes(dag, net):
         '''Matrix Multiplication with Top 2 From Stack'''
-        # Do nothing if there aren't enough nodes in the stack
-        if len(net['nodes']) < 2:
+        # Do nothing if there aren't enough nodes in the stack or they're 1D
+        if len(net['nodes']) < 2 or len(net['nodes'][0].shape) < 2 or len(net['nodes'][1].shape) < 2:
             return
 
         # If not multiplicable, return (noop)
@@ -87,6 +85,8 @@ class Instructions:
         # Pop the top 2 nodes from the stack
         pop_node1 = net['nodes'].popleft()
         pop_node2 = net['nodes'].popleft()
+        print(f'Node 1: {pop_node1.shape}')
+        print(f'Node 2: {pop_node2.shape}')
 
         # Create new node
         node = Node (
@@ -161,12 +161,12 @@ class Instructions:
         last_shape = pop_node.shape
 
         prod = 1
-        for x in last_shape[1:]:
+        for x in last_shape:
             prod *= x
 
         # Create new node
         node = Node(
-            shape=(last_shape[0], prod),
+            shape=(prod,),
             layer=pop_node.layer + 1,
             fn=lambda x: torch.flatten(x, start_dim=1),
             parents=[pop_node],
@@ -187,6 +187,8 @@ class Instructions:
         if len(net['nodes']) < 1 or len(stacks['int']) < 2:
             return
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
+        if net['nodes'][0].shape is None:
+            print(net['nodes'])
         if len(net['nodes'][0].shape) < 4:
             return
         # Check if kernel size is valid
@@ -201,7 +203,7 @@ class Instructions:
         kernel_size = stacks['int'].pop()
         num_filters = stacks['int'].pop()
 
-        # Define the kernel shape based on the number of input and output channels (filters_
+        # Define the kernel shape based on the number of input and output channels
         in_channels = pop_node.shape[1]
         kernel = torch.randn(num_filters, in_channels, kernel_size, kernel_size, requires_grad=True, device=device)  # (out_channels, in_channels, height, width)
 
