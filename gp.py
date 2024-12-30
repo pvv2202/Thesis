@@ -215,6 +215,12 @@ class Population:
                 gen_acc.append(accuracy)
                 print(f"Genome Accuracy: {accuracy}")
                 print(f"Genome Loss: {loss}")
+
+                # Prevent memory leaks
+                del network
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
             acc.append(gen_acc)
             size.append(gen_size)
 
