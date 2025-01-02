@@ -36,8 +36,9 @@ class Interpreter:
         if train_y.ndim == 0: # Single value
             self.output_shape = (1,)
         elif train_y.ndim == 1: # Classification
-            num_classes = len(torch.unique(train_y))
-            self.output_shape = (num_classes,)
+            # num_classes = len(torch.unique(train_y))
+            # self.output_shape = (num_classes,)
+            self.output_shape = (10,)
         else: # Regression or multi-class/multi-label classification
             self.output_shape = tuple(train_y.size())
 
@@ -97,7 +98,6 @@ class Interpreter:
 
         if last_dim < output_dim:
             # If last_dim < output_dim, we need project it up to the output dim.
-            print("HERE")
             for _ in range(output_dim - last_dim):
                 # Add a node that unsqueezes the last dimension to the dag.
                 node = Node(

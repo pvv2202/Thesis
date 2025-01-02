@@ -268,7 +268,6 @@ class Population:
                                capprops=dict(color='black'),
                                boxprops=dict(facecolor='lavender', color='black'),
                                flierprops=dict(markerfacecolor='green', marker='D'))
-
         plt.title('Box Plot of Accuracy Over Generations')
         plt.xlabel('Generation')
         plt.ylabel('Accuracy')

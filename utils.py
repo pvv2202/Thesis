@@ -137,25 +137,51 @@ def conv2dable(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
 
     return True
 
-def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
+def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding='valid', dilation=1):
     '''
     Returns the shape of the resulting tensor from a 2D convolution operation
     between a tensor of shape matrix and a kernel of shape kernel. Supports
     asymmetric kernels and matrices. Bias is added by default
     '''
     # If the input is under 3D (channel, h, w), or the kernel is not 3D (channel, h, w), we no-op
-    if len(matrix_shape) < 3 or len(kernel_shape) != 3:
+    if len(matrix_shape) < 3:
         return None
 
     h_in, w_in = matrix_shape[-2:]
     c_ko, c_ki, h_k, w_k = kernel_shape
+
+    # Valid preserves the same shape
+    if padding == 'valid':
+        return (c_ko, h_in, w_in)
 
     # Compute the output dimensions
     h_out = (h_in + 2 * padding - dilation * (h_k - 1) - 1) // stride + 1
     w_out = (w_in + 2 * padding - dilation * (w_k - 1) - 1) // stride + 1
 
     # Return the output shape (batch/channel are the same)
-    return (matrix_shape[0], c_ko, h_out, w_out)
+    return (c_ko, h_out, w_out)
+
+def maxpool2d_shape(matrix_shape, kernel_size, stride=2):
+    '''
+    Returns the shape of the resulting tensor from a 2D max pooling operation
+    '''
+    # If the input is under 3D (channel, h, w), or the kernel is not 3D (channel, h, w), we no-op
+    if len(matrix_shape) < 3:
+        return None
+
+    c, h_in, w_in = matrix_shape[-3:]
+    h_k, w_k = kernel_size
+
+    # Default stride is the kernel size
+    if stride is None:
+        stride = kernel_size
+
+    # Compute the output dimensions
+    h_out = (h_in - h_k) // stride + 1
+    w_out = (w_in - w_k) // stride + 1
+
+    # Return the output shape (batch/channel are the same)
+    return (c, h_out, w_out)
 
 def median_absolute_deviation(data):
     """Calculate the Median Absolute Deviation (MAD)."""

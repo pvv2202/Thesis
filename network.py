@@ -1,6 +1,7 @@
 import torch
 from collections import deque
 from line_profiler import profile
+from tqdm import tqdm
 
 class Network:
     def __init__(self, dag, train, test, params, device):
@@ -25,6 +26,7 @@ class Network:
             queue.extend(self.dag.graph[node]) # Add children to queue
             node.execute(self.params, self.device) # Execute the function at node
             out = node
+            # print(f"Node: {node.desc}, Expected Shape: {node.shape}, Actual Shape: {node.tensor.shape}")
 
         if len(out.tensor.shape) > 2:
             print("Output too big")
@@ -48,15 +50,17 @@ class Network:
         optimizer = optimizer_class(self.params, lr=learning_rate)
 
         for epoch in range(epochs):
-            for x, y in self.train:
+            # Iterate over the training data, use tqdm to show a progress bar
+            for x, y in tqdm(self.train, desc=f"Epoch {epoch + 1}/{epochs}", unit='batch', colour='green'):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 y_pred = self.forward(x)
+
                 # Forward pass and compute loss
                 l = self.loss(y_pred, y, loss_fn)
 
                 # If the network is invalid, return
-                if type(l) == float:
+                if isinstance(l, float):
                     return
 
                 # Backpropagation
@@ -64,6 +68,8 @@ class Network:
 
                 # Update parameters
                 optimizer.step()
+
+            print(f"Epoch {epoch + 1}/{epochs} finished.")
 
     def evaluate(self, loss_fn=torch.nn.functional.cross_entropy):
         '''Evaluate the model on the test set. Returns loss, accuracy tuple'''

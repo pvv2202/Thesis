@@ -118,7 +118,7 @@ class Instructions:
             return
 
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
-        if len(net['nodes'][0].shape) < 4:
+        if len(net['nodes'][0].shape) < 3:
             return
 
         # Check if maxpooling is possible.
@@ -130,7 +130,7 @@ class Instructions:
 
         # Create new node
         node = Node(
-            shape=utils.conv2d_shape(pop_node.shape, (pop_node.shape[1], pop_node.shape[1], 2, 2), stride=2),
+            shape=utils.maxpool2d_shape(pop_node.shape, (2, 2), stride=2),
             layer=pop_node.layer + 1,
             fn=lambda x: F.max_pool2d(x, kernel_size=2, stride=2), # For now, hardcode kernel size and stride
             parents=[pop_node],
@@ -189,7 +189,7 @@ class Instructions:
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
         if net['nodes'][0].shape is None:
             print(net['nodes'])
-        if len(net['nodes'][0].shape) < 4:
+        if len(net['nodes'][0].shape) < 3:
             return
         # Check if kernel size is valid
         if stacks['int'][-1] > net['nodes'][0].shape[-1] or stacks['int'][-1] > net['nodes'][0].shape[-2]:
@@ -204,7 +204,7 @@ class Instructions:
         num_filters = stacks['int'].pop()
 
         # Define the kernel shape based on the number of input and output channels
-        in_channels = pop_node.shape[1]
+        in_channels = pop_node.shape[0]
         kernel = torch.randn(num_filters, in_channels, kernel_size, kernel_size, requires_grad=True, device=device)  # (out_channels, in_channels, height, width)
 
         # Bias term for each filter (output channel)
@@ -213,10 +213,11 @@ class Instructions:
         # Add the kernel and bias to the 'params' stack
         net['params'].extend([kernel, bias])
 
+        # TODO: Add different padding options?
         node = Node(
             shape=utils.conv2d_shape(pop_node.shape, kernel.shape),
             layer=pop_node.layer + 1,
-            fn=lambda x: F.conv2d(input=x, weight=kernel, bias=bias, stride=1, padding=0, dilation=1),
+            fn=lambda x: F.conv2d(input=x, weight=kernel, bias=bias, stride=1, padding='same', dilation=1),
             parents=[pop_node],
             desc="Conv2d"
         )
