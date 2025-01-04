@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     '''Population Example'''
     # pop = Population.load("pop.pkl")
-    pop = gp.Population(size=25, num_initial_genes=50, train=train_loader, test=test_loader, activation=torch.softmax)
+    pop = gp.Population(size=25, num_initial_genes=50, train=train_loader, test=test_loader, activation="relu")
     # pop.save("pop.pkl")
     pop.run(generations=50, epochs=3, method='tournament', pool_size=8)
 

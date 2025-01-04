@@ -2,8 +2,6 @@ import numpy as np
 import random
 
 # TODO: Create tests for these functions
-# TODO: Fix all of these now that batch isn't included in the shape
-
 def addable(shape1, shape2):
     '''
     Manually checks if two tensors are broadcast-compatible according to broadcasting rules.

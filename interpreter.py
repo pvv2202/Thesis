@@ -6,6 +6,10 @@ from dag import *
 from utils import *
 from network import Network
 
+# TODO: Maybe do the same with bias?
+# Functions to be activated if activation is not None (default is relu)
+ACTIVE = ['matmul', 'conv2d']
+
 class Interpreter:
     '''Push Interpreter'''
     def __init__(self, train, test, activation):
@@ -27,6 +31,7 @@ class Interpreter:
 
         self.train = train
         self.test = test
+        # TODO: Improve this. Right now you can specify a consistent activation function (default relu).
         self.activation = activation
 
         # Get input/output shapes
@@ -43,7 +48,7 @@ class Interpreter:
             self.output_shape = tuple(train_y.size())
 
         # Initialize instructions
-        self.instructions = Instructions()
+        self.instructions = Instructions(activation=self.activation)
 
     def read_genome(self, genome):
         '''Reads the genome and processes it into stacks'''
@@ -71,11 +76,15 @@ class Interpreter:
             # Get next instruction
             instr = self.stacks['exec'].pop()
             # Execute instruction
-            self.instructions(dag, self.net, self.stacks, self.device, instr)
-            if self.net['nodes'][-1].shape == None:
-                print(self.net['nodes'][-1].desc)
-                for parent in self.net['nodes'][-1].parents:
-                    print(parent.shape)
+            added = self.instructions(dag, self.net, self.stacks, self.device, instr)
+            # If activation is not None and instruction requires activation, add activation function to stack
+            if added and self.activation is not None and instr in ACTIVE:
+                self.instructions(dag, self.net, self.stacks, self.device, self.activation)
+
+            # if self.net['nodes'][-1].shape == None:
+            #     print(self.net['nodes'][-1].desc)
+            #     for parent in self.net['nodes'][-1].parents:
+            #         print(parent.shape)
 
         self.add_output(dag) # Add output layer
 
@@ -110,7 +119,6 @@ class Interpreter:
                 dag.add_edge(last_node, node)
                 last_node = node
         elif last_dim > output_dim:
-            # TODO: If output_dim is 2/3D + batch, this won't work. I guess for now assume it won't be? There are ways to do this
             # If last_dim > output_dim, Add a node that flattens the last dimension. Flatten ignores the batch dimension.
             prod = 1
             for x in last_shape:

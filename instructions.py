@@ -6,11 +6,17 @@ import inspect
 
 # TODO: Add a bool stack for things like bias in conv
 
+ACTIVATIONS = ['relu', 'sigmoid', 'softmax']
+
 class Instructions:
-    '''Instructions for the Push Interpreter'''
-    def __init__(self):
-        '''Initialize Instructions'''
-        self.instructions  = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process")]
+    '''Instructions for the Push Interpreter. Returns True if instruction was successful (added to dag), False otherwise'''
+    def __init__(self, activation):
+        '''Initialize Instructions. If activation is None, all instructions are available. Otherwise, we exclude activation functions'''
+        # TODO: Run tests to see if this make sense
+        if activation is not None:
+            self.instructions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process") and func not in ACTIVATIONS]
+        else:
+            self.instructions  = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process")]
 
     def __call__(self, dag, net, stacks, device, instruction):
         '''Call instruction on state'''
@@ -40,7 +46,7 @@ class Instructions:
         '''Matrix Multiplication'''
         # Do nothing if there are no nodes or integers
         if len(net['nodes']) < 1 or len(stacks['int']) < 1 or len(net['nodes'][0].shape) < 1:
-            return
+            return False
 
         # Pop the top node from queue, top integer from the stack
         pop_node = net['nodes'].popleft()
@@ -71,16 +77,18 @@ class Instructions:
         # Add new node to stack
         net['nodes'].append(node)
 
+        return True
+
     @staticmethod
     def matmul_nodes(dag, net):
         '''Matrix Multiplication with Top 2 From Stack'''
         # Do nothing if there aren't enough nodes in the stack or they're 1D
         if len(net['nodes']) < 2 or len(net['nodes'][0].shape) < 2 or len(net['nodes'][1].shape) < 2:
-            return
+            return False
 
         # If not multiplicable, return (noop)
         if not utils.multable(net['nodes'][0].shape, net['nodes'][1].shape):
-            return
+            return False
 
         # Pop the top 2 nodes from the stack
         pop_node1 = net['nodes'].popleft()
@@ -105,6 +113,7 @@ class Instructions:
 
         net['nodes'].append(node)
 
+        return True
 
     #########################
     ###### Convolution ######
@@ -115,15 +124,15 @@ class Instructions:
         '''2D Max Pooling'''
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 1:
-            return
+            return False
 
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
         if len(net['nodes'][0].shape) < 3:
-            return
+            return False
 
         # Check if maxpooling is possible.
         if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2), stride=2):
-            return
+            return False
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
@@ -143,6 +152,8 @@ class Instructions:
         # Add new node to stack
         net['nodes'].append(node)
 
+        return True
+
     # TODO: Add a weird convolution that doesn't use conv2d but uses matmul?
 
     @staticmethod
@@ -150,11 +161,11 @@ class Instructions:
         '''Flatten'''
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 1:
-            return
+            return False
 
         # Ensure top node has more than 1 dimension
         if len(net['nodes'][0].shape) < 2:
-            return
+            return False
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
@@ -179,24 +190,26 @@ class Instructions:
         # Add new node to stack
         net['nodes'].append(node)
 
+        return True
+
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod
     def conv2d(dag, net, stacks, device):
         '''2D Convolution'''
         # Do nothing if there aren't enough nodes or integers in the stack
         if len(net['nodes']) < 1 or len(stacks['int']) < 2:
-            return
+            return False
         # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
         if net['nodes'][0].shape is None:
             print(net['nodes'])
         if len(net['nodes'][0].shape) < 3:
-            return
+            return False
         # Check if kernel size is valid
         if stacks['int'][-1] > net['nodes'][0].shape[-1] or stacks['int'][-1] > net['nodes'][0].shape[-2]:
-            return
+            return False
         # If we can't convolve, just return
         if not utils.conv2dable(net['nodes'][0].shape, (stacks['int'][-2], net['nodes'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
-            return
+            return False
 
         # Pop the top node, kernel size, and number of filters from the stack
         pop_node = net['nodes'].popleft()
@@ -225,6 +238,8 @@ class Instructions:
 
         net['nodes'].append(node)
 
+        return True
+
     #########################
     #### Matrix Addition ####
     #########################
@@ -234,7 +249,7 @@ class Instructions:
         '''Matrix Addition'''
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 1:
-            return
+            return False
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
@@ -256,16 +271,18 @@ class Instructions:
 
         net['nodes'].append(node)
 
+        return True
+
     @staticmethod
     def mat_add_nodes(dag, net):
         '''Matrix Addition of Nodes on Stack'''
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 2:
-            return
+            return False
 
         # If not addable, return (noop)
         if not utils.addable(net['nodes'][0].shape, net['nodes'][1].shape):
-            return
+            return False
 
         # Pop the top 2 nodes from the stack
         pop_node1 = net['nodes'].popleft()
@@ -288,6 +305,8 @@ class Instructions:
 
         net['nodes'].append(node)
 
+        return True
+
     #########################
     ####### Stack Ops #######
     #########################
@@ -296,8 +315,10 @@ class Instructions:
     def dup(net):
         '''Duplicate the top node on the node queue'''
         if len(net['nodes']) < 1:
-            return
+            return False
         net['nodes'].append(net['nodes'][0])
+
+        return True
 
     #########################
     ###### PyTorch Ops ######
@@ -308,7 +329,7 @@ class Instructions:
         '''Pop the top 2 tensors from the tensor stack'''
         # Do nothing if there aren't enough tensors in the stack
         if len(net['nodes']) < 1:
-            return
+            return False
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
@@ -327,6 +348,8 @@ class Instructions:
 
         # Add new node to stack
         net['nodes'].append(node)
+
+        return True
 
     # Activation Functions
     @staticmethod
@@ -359,7 +382,7 @@ class Instructions:
     #     '''Pop the top tensor from the tensor stack and the top int from the int stack'''
     #     # Do nothing if there aren't enough tensors in the stack
     #     if len(net['nodes']) < 1:
-    #         return
+    #         return False
     #
     #     # Pop the top node and int from the stack
     #     pop_node = net['nodes'].popleft()
@@ -378,23 +401,25 @@ class Instructions:
     #
     #     # Add new node to stack
     #     net['nodes'].append(node)
-
+    #
+    #     return True
+    #
     # @staticmethod
     # def mat_add_int(dag, net, stacks):
     #     '''Matrix Addition with Int'''
     #     # Do nothing if there aren't enough ints in the stack
     #     if len(stacks['int']) < 1:
-    #         return
+    #         return False
     #
     #     pop_int = stacks['int'].pop()
     #     Instructions.process_mat_scalar_ops(dag, net, stacks, lambda x: torch.add(x, pop_int), "Mat_Add_Int")
-
+    #
     # @staticmethod
     # def mat_add_float(dag, net, stacks):
     #     '''Matrix Addition with Float'''
     #     # Do nothing if there aren't enough floats in the stack
     #     if len(stacks['float']) < 1:
-    #         return
+    #         return False
     #
     #     pop_float = stacks['float'].pop()
     #     Instructions.process_mat_scalar_ops(dag, net, stacks, lambda x: torch.add(x, pop_float), "Mat_Add_Float")
@@ -404,40 +429,44 @@ class Instructions:
     #     '''Matrix Multiplication with Float'''
     #     # Do nothing if there aren't enough floats in the stack
     #     if len(stacks['float']) < 1:
-    #         return
+    #         return False
     #
     #     pop_float = stacks['float'].pop()
     #     Instructions.process_mat_scalar_ops(dag, net, stacks, lambda x: torch.mul(x, pop_float), "Mat_Mult_Float")
-
-    #########################
-    ######## Int Ops ########
-    #########################
-
+    #
+    # ########################
+    # ####### Int Ops ########
+    # ########################
+    #
     # @staticmethod
     # def process_ints(stacks, fn):
     #     '''Pop the top 2 ints from the int stack'''
     #     # Do nothing if there aren't enough integers in the stack
     #     if len(stacks['int']) < 2:
-    #         return
+    #         return False
     #
     #     fn(stacks['int'].pop(), stacks['int'].pop())
-
+    #
+    #     return True
+    #
     # @staticmethod
     # def add_int(stacks):
     #     '''Add ints from int stack'''
     #     Instructions.process_ints(stacks, lambda x, y: x + y)
-
+    #
     # @staticmethod
     # def mult_int(stacks):
     #     '''Multiply ints from int stack'''
     #     Instructions.process_ints(stacks, lambda x, y: x * y)
-
+    #
     # @staticmethod
     # def dup_int(stacks):
     #     '''Duplicate the top int on the int stack'''
     #     if len(stacks['int']) < 1:
-    #         return
+    #         return False
     #     stacks['int'].append(stacks['int'][-1])
+    #
+    #     return True
     #
     # #########################
     # ####### Float Ops #######
@@ -448,9 +477,11 @@ class Instructions:
     #     '''Pop the top 2 floats from the float stack'''
     #     # Do nothing if there aren't enough floats in the stack
     #     if len(stacks['float']) < 2:
-    #         return
+    #         return False
     #
     #     fn(stacks['float'].pop(), stacks['float'].pop())
+    #
+    #     return True
     #
     # @staticmethod
     # def add_float(stacks):
@@ -476,5 +507,7 @@ class Instructions:
     # def dup_float(stacks):
     #     '''Duplicate the top float on the float stack'''
     #     if len(stacks['float']) < 1:
-    #         return
+    #         return False
     #     stacks['float'].append(stacks['float'][-1])
+    #
+    #     return True

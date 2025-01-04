@@ -13,9 +13,6 @@ FLOAT_RANGE = (0.0, 1.0)
 ADD_RATE = 0.18
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 
-# TODO: Take random genomes and run UMAD a bunch just to see what happens. Neutral landscapes?
-# TODO: Have int equal probability of adding small ints and a larger range?
-
 class Genome:
     '''Genome of a Push Program'''
     def __init__(self, train, test, activation):
@@ -28,7 +25,7 @@ class Genome:
         self.results = None
 
         # Initialize instructions
-        self.instructions = Instructions()
+        self.instructions = Instructions(activation=activation)
 
     def random_index(self):
         '''Returns a random index in the genome'''
