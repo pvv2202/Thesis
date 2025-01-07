@@ -22,7 +22,7 @@ class Genome:
         self.test = test
         self.activation = activation
         self.network = None
-        self.results = None
+        self.results = {} # Results of the network on the test data
 
         # Initialize instructions
         self.instructions = Instructions(activation=activation)
@@ -115,6 +115,7 @@ class Population:
 
     def tournament(self, size):
         '''Selects the best genome from a tournament with size individuals'''
+        size = min(size, self.size) # Ensure size is not greater than the population size
         tournament = random.sample(self.population, size)
         return max(tournament, key=lambda x: x.fitness)
 
@@ -158,7 +159,7 @@ class Population:
     def forward_generation(self, method='tournament', size=5, max_rounds=5):
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Higher fitness is better
-        self.population.sort(key=lambda x: x.fitness, reverse=True)
+        self.population.sort(key=lambda x: x.fitness[1], reverse=True) # Sort by accuracy currently
         print([genome.fitness[1] for genome in self.population]) # Should print accuracy
 
         match method:
@@ -185,7 +186,7 @@ class Population:
         for genome in self.population:
             genome.UMAD()
 
-    def run(self, generations, epochs, method='tournament', pool_size=5):
+    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=500000):
         '''Runs the population on the train and test data'''
         acc = []
         size = []
@@ -196,24 +197,29 @@ class Population:
             for genome in self.population:
                 gen_size.append(len(genome.genome))
                 network = genome.transcribe()
-                print(network)
-                # Train the network
-                network.fit(epochs=epochs)
+                if network.param_count < param_limit: # If network is small enough
+                    print(network)
+                    # Train the network
+                    network.fit(epochs=epochs)
 
-                # Evaluate the network
-                loss, accuracy, results = network.evaluate()
-                genome.fitness = (loss, accuracy)
-                genome.results = results
+                    # Evaluate the network
+                    loss, accuracy, results = network.evaluate()
+                    genome.fitness = (loss, accuracy)
+                    genome.results = results
 
-                # Update best genome
-                if accuracy > best_genome[1]:
-                    best_genome = (genome, accuracy)
+                    # Update best genome
+                    if accuracy > best_genome[1]:
+                        best_genome = (genome, accuracy)
 
-                gen_acc.append(accuracy)
-                print(f"Genome Accuracy: {accuracy}")
-                print(f"Genome Loss: {loss}")
+                    gen_acc.append(accuracy)
+                    print(f"Genome Accuracy: {accuracy}")
+                    print(f"Genome Loss: {loss}")
+                else:
+                    genome.fitness = (float('inf'), float('-inf')) # Worst possible fitness
+                    for batch in range(len(self.test)):
+                        genome.results[batch] = (float('inf'), float('-inf')) # Worst possible case on each batch
 
-                # Prevent memory leaks
+                # Prevent memory leaks by clearing cuda cache
                 del network
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
@@ -227,7 +233,8 @@ class Population:
 
             self.forward_generation(method=method, size=pool_size)
 
-        print(f"Best genome: {best_genome[0].genome}")
+        if best_genome[0] is not None:
+            print(f"Best genome: {best_genome[0].genome}")
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]
@@ -270,3 +277,7 @@ class Population:
         plt.ylabel('Accuracy')
         plt.tight_layout()  # Automatically adjusts layout to fit elements
         plt.show()
+
+        # Save accuracy data to csv file for excel plotting
+        acc_csv = np.array(acc)
+        np.savetxt("accuracy.csv", acc_csv, delimiter=",")

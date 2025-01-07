@@ -11,6 +11,7 @@ class Network:
         self.test = test
         self.params = params
         self.device = device
+        self.param_count = sum(p.numel() for p in self.params) # Number of elements across all parameter arrays
 
     @profile
     def forward(self, x):
@@ -105,4 +106,4 @@ class Network:
         return total_loss, accuracy, results
 
     def __str__(self):
-        return self.dag.__str__()
+        return self.dag.__str__() + '\n' + f"Parameters: {self.param_count}"
