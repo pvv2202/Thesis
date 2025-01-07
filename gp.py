@@ -215,7 +215,8 @@ class Population:
                     print(f"Genome Accuracy: {accuracy}")
                     print(f"Genome Loss: {loss}")
                 else:
-                    genome.fitness = (float('inf'), float('-inf')) # Worst possible fitness
+                    genome.fitness = (float('inf'), 0) # Worst possible fitness
+                    gen_acc.append(0)
                     for batch in range(len(self.test)):
                         genome.results[batch] = (float('inf'), float('-inf')) # Worst possible case on each batch
 

@@ -93,8 +93,6 @@ class Instructions:
         # Pop the top 2 nodes from the stack
         pop_node1 = net['nodes'].popleft()
         pop_node2 = net['nodes'].popleft()
-        print(f'Node 1: {pop_node1.shape}')
-        print(f'Node 2: {pop_node2.shape}')
 
         # Create new node
         node = Node (
