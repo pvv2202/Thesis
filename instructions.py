@@ -274,6 +274,7 @@ class Instructions:
     @staticmethod
     def mat_add_nodes(dag, net):
         '''Matrix Addition of Nodes on Stack'''
+        # TODO: Can add unsqueezing to make these work. For now, ensure they are the same dimension
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 2:
             return False

@@ -9,6 +9,10 @@ def addable(shape1, shape2):
         1. The dimensions are equal, or
         2. One of the dimensions is 1.
     '''
+    # Ensure they have the same dimensionality
+    if len(shape1) != len(shape2):
+        return False
+
     # Compare from right to left (last dimension to first)
     for d1, d2 in zip(reversed(shape1), reversed(shape2)):
         if d1 != d2 and d1 != 1 and d2 != 1:
@@ -25,7 +29,7 @@ def add_shape(shape1, shape2):
     dim1 = len(shape1)
     dim2 = len(shape2)
 
-    # Pad the shorter shape with ones on the left (most significant dimensions)
+    # Pad the shorter shape with ones on the left (most significant dimensions). Not currently necessary but will be if I add auto unsqueezing.
     if dim1 < dim2:
         shape1 = [1] * (dim2 - dim1) + shape1
     elif dim2 < dim1:
@@ -39,8 +43,7 @@ def add_shape(shape1, shape2):
             # If dimensions are equal or one of them is 1, broadcasting is possible
             result_shape.append(max(d1, d2))
         else:
-            # Otherwise, broadcasting is not possible. Should never happen because we check beforehand,
-            # but just in case
+            # Otherwise, broadcasting is not possible. Should never happen because we check beforehand, but just in case
             return None
 
     return tuple(result_shape)

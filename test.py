@@ -71,7 +71,9 @@ if __name__ == "__main__":
 
     '''Individual Tests'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation='relu')
-    # genome.genome = [36, 166, 'normalize', 54, 154, 'conv2d', 'flatten', 153, 'mat_add_nodes', 59, 154, 93, 32, 'matmul', 'maxpool2d', 31, 'mat_add_nodes', 'normalize', 213, 22, 'matmul', 145, 'matmul_nodes', 'flatten', 217, 114, 'matmul', 'mat_add', 92, 'flatten', 2, 'mat_add_nodes', 224, 241, 205, 'matmul_nodes', 'maxpool2d', 223, 185, 77, 'matmul', 241, 'matmul', 'matmul_nodes', 72, 99, 112, 'conv2d', 'matmul']
+    # genome.genome = [
+    #     'flatten', 'mat_add_nodes', 'normalize', 256, 3, 64, 'conv2d', 1, 64, 4, 'mat_add', 'flatten', 4, 4, 1, 'normalize', 'matmul', 4, 'matmul', 3, 32, 'mat_add_nodes', 'conv2d', 'mat_add', 'matmul', 128, 'matmul', 'mat_add_nodes', 'normalize', 'mat_add', 'normalize', 'maxpool2d', 'normalize', 'normalize', 128, 16, 64, 'matmul', 16, 2, 'matmul_nodes', 8, 4, 'mat_add', 128, 'flatten', 'mat_add', 3, 'dup', 'maxpool2d', 'matmul'
+    # ]
     # network = genome.transcribe()
     # print(network)
     # network.fit(epochs=10)
