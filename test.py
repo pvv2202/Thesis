@@ -70,13 +70,11 @@ if __name__ == "__main__":
     # print(f"Fitness: {genome.fitness}")
 
     '''Individual Tests'''
-    # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
-    # genome.genome = [74, 183, 'sigmoid', 'maxpool2d', 'mat_add_nodes', 210, 'sigmoid', 'normalize', 'matmul_nodes', 86, 'normalize', 97, 'sigmoid', 'flatten', 'relu', 'matmul', 220, 'matm
-    # ul_nodes', 'sigmoid', 250, 200, 'flatten', 'matmul_nodes', 'normalize', 256, 'normalize', 232, 'mat_add', 'maxpool2d', 19, 'dup', 235, 190, 183, 'mat_add_nodes', 'flatten', 'conv2d', 'dup', 70, 'relu', 'flatten', 'relu', 'sigmoid', 150, 'relu', 'mat_add_nodes', 'maxpool2d', 'relu', 'dup', 'normalize']
-    # genome.genome = [99, 121, 'sigmoid', 'dup', 'mat_add', 97, 166, 16, 108, 'conv2d', 36, 'normalize', 'dup', 'maxpool2d', 'relu', 218, 129, 215, 139, 10, 'matmul_stack', 212, 'flatten', 'conv2d']
+    # genome = gp.Genome(train=train_loader, test=test_loader, activation='relu')
+    # genome.genome = [36, 166, 'normalize', 54, 154, 'conv2d', 'flatten', 153, 'mat_add_nodes', 59, 154, 93, 32, 'matmul', 'maxpool2d', 31, 'mat_add_nodes', 'normalize', 213, 22, 'matmul', 145, 'matmul_nodes', 'flatten', 217, 114, 'matmul', 'mat_add', 92, 'flatten', 2, 'mat_add_nodes', 224, 241, 205, 'matmul_nodes', 'maxpool2d', 223, 185, 77, 'matmul', 241, 'matmul', 'matmul_nodes', 72, 99, 112, 'conv2d', 'matmul']
     # network = genome.transcribe()
     # print(network)
-    # network.fit(epochs=1)
+    # network.fit(epochs=10)
     # fitness = network.evaluate()
     # print(f"Genome fitness: {fitness}")
 

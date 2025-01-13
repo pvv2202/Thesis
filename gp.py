@@ -8,16 +8,20 @@ import torch
 import copy
 import pickle
 
-INT_RANGE = (1, 256)
-FLOAT_RANGE = (0.0, 1.0)
+# TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
+INT_RANGE = (1, 5)
+MULT_VALS = [4, 8, 16, 32, 64, 128, 256]
 ADD_RATE = 0.18
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
+# TODO: Experiment with alpha
+ALPHA = 0.5 # Used for loss function with parameter count. Between 0 and 1
 
 class Genome:
     '''Genome of a Push Program'''
     def __init__(self, train, test, activation):
         self.genome = []
         self.fitness = 0
+        self.metrics = (float('inf'), float('-inf'), float('inf')) # Loss, accuracy, parameter count
         self.train = train
         self.test = test
         self.activation = activation
@@ -40,15 +44,18 @@ class Genome:
     def random_gene(self):
         '''Returns a random gene'''
         # Randomly select what type of thing to add
-        type = random.randint(0, 1)
+        data_type = random.randint(0, 1)
 
-        match type:
+        match data_type:
             case 0:
-                return random.randint(*INT_RANGE) # Random integer
+                int_type = random.randint(0, 1)
+                match int_type:
+                    case 0:
+                        return random.choice(MULT_VALS) # Random multiple of input size
+                    case 1:
+                        return random.randint(*INT_RANGE) # Random integer
             case 1:
                 return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
-            case 2:
-                return random.uniform(*FLOAT_RANGE) # Random float
 
     def UMAD(self):
         '''
@@ -192,8 +199,9 @@ class Population:
         size = []
         best_genome = (None, float('-inf'))
         for gen_num in range(1, generations + 1):
-            gen_acc = []
-            gen_size = []
+            gen_acc = [] # Store accuracies for graphing
+            gen_size = [] # Store sizes for graphing
+            param_max = 0
             for genome in self.population:
                 gen_size.append(len(genome.genome))
                 network = genome.transcribe()
@@ -202,9 +210,10 @@ class Population:
                     # Train the network
                     network.fit(epochs=epochs)
 
-                    # Evaluate the network
+                    # Evaluate the network, store results
                     loss, accuracy, results = network.evaluate()
-                    genome.fitness = (loss, accuracy)
+                    param_max = max(param_max, network.param_count)
+                    genome.metrics = (loss, accuracy, network.param_count)
                     genome.results = results
 
                     # Update best genome
@@ -224,6 +233,16 @@ class Population:
                 del network
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
+
+            # Update fitness using normalized param count
+            # TODO: Incorporate accuracy and loss into once fitness function somehow?
+            for genome in self.population:
+                p_norm = genome.metrics[2] / param_max # Just parameter count / max parameter count
+                genome.fitness = (
+                    # TODO: Normalization may not be good for loss. Probably too small
+                    (1 - ALPHA) * genome.metrics[1] + ALPHA * p_norm, # Loss
+                    (1 - ALPHA) * genome.metrics[0] - ALPHA * p_norm, # Accuracy
+                )
 
             acc.append(gen_acc)
             size.append(gen_size)
