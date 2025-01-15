@@ -9,10 +9,12 @@ from network import Network
 # TODO: Maybe do the same with bias?
 # Functions to be activated if activation is not None (default is relu)
 ACTIVE = ['matmul', 'conv2d']
+# Functions to have manual bias added. Conv2d does it automatically so don't include it here.
+BIAS = ['matmul']
 
 class Interpreter:
     '''Push Interpreter'''
-    def __init__(self, train, test, activation):
+    def __init__(self, train, test, activation, auto_bias):
         self.stacks = {
             'int': [], # Really just Natural numbers
             'float': [],
@@ -33,11 +35,11 @@ class Interpreter:
         self.test = test
         # TODO: Improve this. Right now you can specify a consistent activation function (default relu).
         self.activation = activation
+        self.auto_bias = auto_bias
 
         # Get input/output shapes
         train_x, train_y = next(iter(train)) # Get example input/output
         self.input_shape = tuple(train_x.size()[1:])
-        batch_size = self.input_shape[0]
         if train_y.ndim == 0: # Single value
             self.output_shape = (1,)
         elif train_y.ndim == 1: # Classification
@@ -77,9 +79,16 @@ class Interpreter:
             instr = self.stacks['exec'].pop()
             # Execute instruction
             added = self.instructions(dag, self.net, self.stacks, self.device, instr)
-            # If activation is not None and instruction requires activation, add activation function to stack
-            if added and self.activation is not None and instr in ACTIVE:
-                self.instructions(dag, self.net, self.stacks, self.device, self.activation)
+
+            # Add bias, activation if specified
+            if added:
+                # If auto bias is not None and instruction requires bias, add bias (mat_add) to stack
+                if self.auto_bias is not None and instr in BIAS:
+                    self.instructions(dag, self.net, self.stacks, self.device, 'mat_add')
+                # If activation is not None and instruction requires activation, add activation function to stack
+                if self.activation is not None and instr in ACTIVE:
+                    self.instructions(dag, self.net, self.stacks, self.device, self.activation)
+
 
             # if self.net['nodes'][-1].shape == None:
             #     print(self.net['nodes'][-1].desc)
@@ -97,6 +106,20 @@ class Interpreter:
             device=self.device
         )
         return network
+
+    def clear(self):
+        '''Clear current data in interpreter'''
+        self.stacks = {
+            'int': [],
+            'float': [],
+            'bool': [],
+            'str': [],
+            'exec': [],
+        }
+        self.net = {
+            'nodes': deque([]),
+            'params': []
+        }
 
     def add_output(self, dag):
         '''Adds the output layer to the DAG, There should always be at least 1 node in the stack'''

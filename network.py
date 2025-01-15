@@ -27,7 +27,7 @@ class Network:
             queue.extend(self.dag.graph[node]) # Add children to queue
             node.execute(self.params, self.device) # Execute the function at node
             out = node
-            print(f"Node: {node.desc}, Expected Shape: {node.shape}, Actual Shape: {node.tensor.shape}")
+            # print(f"Node: {node.desc}, Expected Shape: {node.shape}, Actual Shape: {node.tensor.shape}")
 
         if len(out.tensor.shape) > 2:
             print("Output too big")

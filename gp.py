@@ -18,18 +18,16 @@ ALPHA = 0.5 # Used for loss function with parameter count. Between 0 and 1
 
 class Genome:
     '''Genome of a Push Program'''
-    def __init__(self, train, test, activation):
+    def __init__(self, train, test, interpreter, instructions):
         self.genome = []
         self.fitness = 0
         self.metrics = (float('inf'), float('-inf'), float('inf')) # Loss, accuracy, parameter count
         self.train = train
         self.test = test
-        self.activation = activation
+        self.interpreter = interpreter
+        self.instructions = instructions
         self.network = None
         self.results = {} # Results of the network on the test data
-
-        # Initialize instructions
-        self.instructions = Instructions(activation=activation)
 
     def random_index(self):
         '''Returns a random index in the genome'''
@@ -87,21 +85,23 @@ class Genome:
 
         # Update genome
         self.genome = new_genome
-
+    # TODO: Move interpreter instance to population
     def transcribe(self):
         '''Transcribes the genome to create a network. Returns the network'''
-        interpreter = Interpreter(self.train, self.test, self.activation) # Pass shapes to interpreter
-        interpreter.read_genome(self.genome)
-        self.network = interpreter.run()
+        self.interpreter.read_genome(self.genome) # Read genome (process it into stacks)
+        self.network = self.interpreter.run() # Generate network object
+        self.interpreter.clear() # Clear stacks
         return self.network
 
 class Population:
     '''Population of Push Program Genomes'''
-    def __init__(self, size, num_initial_genes, train, test, activation=torch.softmax):
+    def __init__(self, size, num_initial_genes, train, test, activation, auto_bias):
         self.size = size
         self.train = train
         self.test = test
-        self.population = [Genome(train, test, activation) for _ in range(size)]
+        self.instructions = Instructions(activation=activation)
+        self.interpreter = Interpreter(train=self.train, test=self.test, activation=activation, auto_bias=auto_bias) # Pass shapes to interpreter
+        self.population = [Genome(train, test, self.interpreter, self.instructions) for _ in range(size)]
         # Initialize the population with random genes
         for genome in self.population:
             genome.initialize_random(num_initial_genes)
