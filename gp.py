@@ -42,6 +42,7 @@ class Genome:
     def random_gene(self):
         '''Returns a random gene'''
         # Randomly select what type of thing to add
+        # TODO: Assign probabilities of adding each type. Ideally prevent the tiny matmuls
         data_type = random.randint(0, 1)
 
         match data_type:

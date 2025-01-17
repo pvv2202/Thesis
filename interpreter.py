@@ -43,9 +43,9 @@ class Interpreter:
         if train_y.ndim == 0: # Single value
             self.output_shape = (1,)
         elif train_y.ndim == 1: # Classification
-            # num_classes = len(torch.unique(train_y))
-            # self.output_shape = (num_classes,)
-            self.output_shape = (10,)
+            num_classes = len(torch.unique(train_y))
+            self.output_shape = (num_classes,)
+            # self.output_shape = (10,)
         else: # Regression or multi-class/multi-label classification
             self.output_shape = tuple(train_y.size())
 
@@ -80,13 +80,16 @@ class Interpreter:
             # Execute instruction
             added = self.instructions(dag, self.net, self.stacks, self.device, instr)
 
-            # Add bias, activation if specified
+            # Add bias, activation if specified. Rotate because we can have multiple branches.
+            # The added node will always be the last element and we need to make sure bias and activation operate on that
             if added:
                 # If auto bias is not None and instruction requires bias, add bias (mat_add) to stack
                 if self.auto_bias is not None and instr in BIAS:
+                    self.net['nodes'].rotate(1)
                     self.instructions(dag, self.net, self.stacks, self.device, 'mat_add')
                 # If activation is not None and instruction requires activation, add activation function to stack
                 if self.activation is not None and instr in ACTIVE:
+                    self.net['nodes'].rotate(1)
                     self.instructions(dag, self.net, self.stacks, self.device, self.activation)
 
 

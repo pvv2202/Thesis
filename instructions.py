@@ -1,5 +1,6 @@
 import torch.nn.functional as F
 import utils
+import copy
 from dag import *
 from utils import *
 import inspect
@@ -311,11 +312,21 @@ class Instructions:
     #########################
 
     @staticmethod
-    def dup(net):
+    def dup(dag, net):
         '''Duplicate the top node on the node queue'''
         if len(net['nodes']) < 1:
             return False
-        net['nodes'].append(net['nodes'][0])
+
+        ref = net['nodes'][0]
+        node = Node(
+            shape=ref.shape,
+            layer=ref.layer,
+            fn=lambda x: x,
+            parents=[ref],
+            desc="Dup"
+        )
+        dag.add_edge(u=ref, v=node)
+        net['nodes'].append(node)
 
         return True
 
