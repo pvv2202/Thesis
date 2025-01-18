@@ -178,6 +178,7 @@ class Interpreter:
         dag.add_edge(last_node, node)
 
         # Prune all nodes that aren't in the path of the output layer. This is crucial. Forward pass can fail if we don't do this.
+        # Due to different branches. There has to be only one final output when we conduct a forward pass
         dag.prune(node)
 
         # TODO: Add support for activation functions

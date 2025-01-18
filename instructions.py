@@ -1,8 +1,8 @@
 import torch.nn.functional as F
+from functools import partial
 import utils
-import copy
 from dag import *
-from utils import *
+from functions import *
 import inspect
 
 # TODO: Add a bool stack for things like bias in conv
@@ -66,7 +66,7 @@ class Instructions:
         node = Node(
             shape=shape,#utils.mult_shape(pop_shape, new_shape),
             layer=pop_node.layer + 1,
-            fn=lambda x, y: torch.matmul(x, y),
+            fn=matmul,
             parents=[pop_node],
             weight_id=len(net['params']) - 1,
             desc="Matmul"
@@ -99,7 +99,7 @@ class Instructions:
         node = Node (
             shape=utils.mult_shape(pop_node1.shape, pop_node2.shape), # Get the shape of the resulting tensor
             layer=max(pop_node1.layer, pop_node2.layer) + 1, # Take the max layer of the two nodes and add 1
-            fn=lambda x, y: torch.matmul(x, y),
+            fn=matmul,
             parents=[pop_node1, pop_node2],
             desc="Matmul_Nodes"
         )
@@ -136,11 +136,14 @@ class Instructions:
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
 
+        # Define partial function
+        max_pool_partial = partial(max_pool, kernel_size=(2,2), stride=None, padding=0)
+
         # Create new node
         node = Node(
             shape=utils.maxpool2d_shape(pop_node.shape, (2, 2), stride=2),
             layer=pop_node.layer + 1,
-            fn=lambda x: F.max_pool2d(x, kernel_size=2, stride=2), # For now, hardcode kernel size and stride
+            fn=max_pool_partial, # For now, hardcode kernel size and stride
             parents=[pop_node],
             desc="Maxpool2d"
         )
@@ -174,11 +177,14 @@ class Instructions:
         for x in last_shape:
             prod *= x
 
+        # Define partial function
+        flatten_partial = partial(flatten, start_dim=1)
+
         # Create new node
         node = Node(
             shape=(prod,),
             layer=pop_node.layer + 1,
-            fn=lambda x: torch.flatten(x, start_dim=1),
+            fn=flatten_partial,
             parents=[pop_node],
             desc="Flatten"
         )
@@ -225,11 +231,14 @@ class Instructions:
         # Add the kernel and bias to the 'params' stack
         net['params'].extend([kernel, bias])
 
+        # Define partial convolution function
+        conv2d_partial = partial(conv2d, kernel=kernel, bias=bias, stride=1, padding='same', dilation=1)
+
         # TODO: Add different padding options?
         node = Node(
             shape=utils.conv2d_shape(pop_node.shape, kernel.shape),
             layer=pop_node.layer + 1,
-            fn=lambda x: F.conv2d(input=x, weight=kernel, bias=bias, stride=1, padding='same', dilation=1),
+            fn=conv2d_partial,
             parents=[pop_node],
             desc="Conv2d"
         )
@@ -261,7 +270,7 @@ class Instructions:
         node = Node (
             shape=pop_node.shape, # Shape is the same as the popped node
             layer=pop_node.layer + 1, # Take the max layer of the two nodes and add 1
-            fn=lambda x, y: torch.add(x, y),
+            fn=mat_add,
             parents=[pop_node],
             weight_id=len(net['params']) - 1,
             desc="Mat_Add"
@@ -292,7 +301,7 @@ class Instructions:
         node = Node (
             shape=utils.add_shape(pop_node1.shape, pop_node2.shape), # Get the shape of the resulting tensor
             layer=max(pop_node1.layer, pop_node2.layer) + 1, # Take the max layer of the two nodes and add 1
-            fn=lambda x, y: torch.add(x, y),
+            fn=mat_add,
             parents=[pop_node1, pop_node2],
             desc="Mat_Add_Nodes"
         )
@@ -321,7 +330,7 @@ class Instructions:
         node = Node(
             shape=ref.shape,
             layer=ref.layer,
-            fn=lambda x: x,
+            fn=dup,
             parents=[ref],
             desc="Dup"
         )
@@ -348,7 +357,7 @@ class Instructions:
         node = Node(
             shape=pop_node.shape,
             layer=pop_node.layer + 1,
-            fn=lambda x: fn(x),
+            fn=fn,
             parents=[pop_node],
             desc=desc
         )

@@ -190,6 +190,8 @@ class Population:
                 # Update the population
                 self.population = new_population
 
+        self.save('pop.pkl')
+
         # Mutate the new population
         for genome in self.population:
             genome.UMAD()

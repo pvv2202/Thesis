@@ -94,7 +94,7 @@ class Network:
                 test_sum += len(y) # Should be a batch of labels
 
                 # Calculate accuracy
-                _, predictions = torch.max(y_pred, -1) # Should always be last dimension
+                _, predictions = torch.max(y_pred, -1) # Should always be last dimension (hence -1)
 
                 correct_predictions += (predictions == y).sum().item()
                 results[i] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
