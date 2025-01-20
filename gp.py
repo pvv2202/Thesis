@@ -9,8 +9,8 @@ import copy
 import pickle
 
 # TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
-INT_RANGE = (1, 5)
-MULT_VALS = [4, 8, 16, 32, 64, 128, 256]
+SINT_RANGE = (1, 5)
+INT_VALS = [8, 16, 32, 64, 128, 256]
 ADD_RATE = 0.18
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 # TODO: Experiment with alpha
@@ -50,9 +50,9 @@ class Genome:
                 int_type = random.randint(0, 1)
                 match int_type:
                     case 0:
-                        return random.choice(MULT_VALS) # Random multiple of input size
+                        return random.choice(INT_VALS) # Random multiple of input size
                     case 1:
-                        return random.randint(*INT_RANGE) # Random integer
+                        return random.randint(*SINT_RANGE) # Random integer
             case 1:
                 return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
 
@@ -96,12 +96,19 @@ class Genome:
 
 class Population:
     '''Population of Push Program Genomes'''
-    def __init__(self, size, num_initial_genes, train, test, activation, auto_bias):
+    def __init__(self, size, num_initial_genes, train, test, activation, auto_bias, separate_ints):
         self.size = size
         self.train = train
         self.test = test
         self.instructions = Instructions(activation=activation)
-        self.interpreter = Interpreter(train=self.train, test=self.test, activation=activation, auto_bias=auto_bias) # Pass shapes to interpreter
+        # Interpreter needs the data (for auto output) and a number of other toggleable options
+        self.interpreter = Interpreter(
+            train=self.train,
+            test=self.test,
+            activation=activation,
+            auto_bias=auto_bias,
+            separate_ints=separate_ints
+        )
         self.population = [Genome(train, test, self.interpreter, self.instructions) for _ in range(size)]
         # Initialize the population with random genes
         for genome in self.population:
@@ -208,29 +215,30 @@ class Population:
             for genome in self.population:
                 gen_size.append(len(genome.genome))
                 network = genome.transcribe()
-                if network.param_count < param_limit: # If network is small enough
-                    print(network)
-                    # Train the network
-                    network.fit(epochs=epochs)
 
-                    # Evaluate the network, store results
-                    loss, accuracy, results = network.evaluate()
-                    param_max = max(param_max, network.param_count)
-                    genome.metrics = (loss, accuracy, network.param_count)
-                    genome.results = results
+                # Delete random genes until the parameter count is below the limit
+                while network.param_count > param_limit:
+                    i = random.randint(0, max(0, len(genome.genome) - 1))
+                    del genome.genome[i]
+                    network = genome.transcribe()
 
-                    # Update best genome
-                    if accuracy > best_genome[1]:
-                        best_genome = (genome, accuracy)
+                print(network)
+                # Train the network
+                network.fit(epochs=epochs)
 
-                    gen_acc.append(accuracy)
-                    print(f"Genome Accuracy: {accuracy}")
-                    print(f"Genome Loss: {loss}")
-                else:
-                    genome.fitness = (float('inf'), 0) # Worst possible fitness
-                    gen_acc.append(0)
-                    for batch in range(len(self.test)):
-                        genome.results[batch] = (float('inf'), float('-inf')) # Worst possible case on each batch
+                # Evaluate the network, store results
+                loss, accuracy, results = network.evaluate()
+                param_max = max(param_max, network.param_count)
+                genome.metrics = (loss, accuracy, network.param_count)
+                genome.results = results
+
+                # Update best genome
+                if accuracy > best_genome[1]:
+                    best_genome = (genome, accuracy)
+
+                gen_acc.append(accuracy)
+                print(f"Genome Accuracy: {accuracy}")
+                print(f"Genome Loss: {loss}")
 
                 # Prevent memory leaks by clearing cuda cache
                 del network
@@ -238,7 +246,6 @@ class Population:
                     torch.cuda.empty_cache()
 
             # Update fitness using normalized param count
-            # TODO: Incorporate accuracy and loss into once fitness function somehow?
             for genome in self.population:
                 p_norm = genome.metrics[2] / param_max # Just parameter count / max parameter count
                 genome.fitness = (

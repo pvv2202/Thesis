@@ -11,15 +11,15 @@ ACTIVATIONS = ['relu', 'sigmoid', 'softmax']
 
 class Instructions:
     '''Instructions for the Push Interpreter. Returns True if instruction was successful (added to dag), False otherwise'''
-    def __init__(self, activation):
+    def __init__(self, activation='relu'):
         '''Initialize Instructions. If activation is None, all instructions are available. Otherwise, we exclude activation functions'''
-        # TODO: Run tests to see if this make sense
+        # TODO: Run tests to see if this make sense.
         if activation is not None:
             self.instructions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process") and func not in ACTIVATIONS]
         else:
             self.instructions  = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process")]
 
-    def __call__(self, dag, net, stacks, device, instruction):
+    def __call__(self, dag, net, stacks, device, instruction, separate_ints):
         '''Call instruction on state'''
         # Access the static method from the class, not the instance
         method = getattr(self.__class__, instruction)
@@ -36,6 +36,8 @@ class Instructions:
                 kwargs['stacks'] = stacks
             elif param.name == 'device':
                 kwargs['device'] = device
+            elif param.name == 'separate_ints':
+                kwargs['separate_ints'] = separate_ints
         return method(**kwargs)
 
     #########################
@@ -199,26 +201,48 @@ class Instructions:
 
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod
-    def conv2d(dag, net, stacks, device):
+    def conv2d(dag, net, stacks, device, separate_ints):
         '''2D Convolution'''
-        # Do nothing if there aren't enough nodes or integers in the stack
-        if len(net['nodes']) < 1 or len(stacks['int']) < 2:
-            return False
-        # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
+        # First check we have enough nodes and integers
+        if separate_ints:
+            # Do nothing if there aren't enough nodes or integers (small and normal) in the stack
+            if len(net['nodes']) < 1 or len(stacks['sint']) < 1 or len(stacks['int']) < 1:
+                return False
+        else:
+            # Same as above but with only one stack for ints. Sint stack still exists for simplicity but is never used
+            if len(net['nodes']) < 1 or len(stacks['int']) < 2:
+                return False
+
+        # Check if the top node's shape has 3 dimensions (channel, height, width). Same for both cases
         if net['nodes'][0].shape is None:
             print(net['nodes'])
         if len(net['nodes'][0].shape) < 3:
             return False
-        # Check if kernel size is valid
-        if stacks['int'][-1] > net['nodes'][0].shape[-1] or stacks['int'][-1] > net['nodes'][0].shape[-2]:
-            return False
-        # If we can't convolve, just return
-        if not utils.conv2dable(net['nodes'][0].shape, (stacks['int'][-2], net['nodes'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
-            return False
+
+        # Check for valid kernel and whether we can convolve
+        if separate_ints:
+            # Check if kernel size is valid. Can't be greater than either dimension along the input
+            if stacks['sint'][-1] > net['nodes'][0].shape[-1] or stacks['sint'][-1] > net['nodes'][0].shape[-2]:
+                return False
+            # If we can't convolve, just return. Kernel will be int (out channels), node channels (int channels) sint, sint (kernel size = h, w)
+            if not utils.conv2dable(net['nodes'][0].shape, (stacks['int'][-1], net['nodes'][0].shape[1], stacks['sint'][-1], stacks['sint'][-1])):
+                return False
+        else:
+            # Check if kernel size is valid. Can't be greater than either dimension along the input
+            if stacks['int'][-1] > net['nodes'][0].shape[-1] or stacks['int'][-1] > net['nodes'][0].shape[-2]:
+                return False
+            # If we can't convolve, just return
+            if not utils.conv2dable(net['nodes'][0].shape, (stacks['int'][-2], net['nodes'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
+                return False
 
         # Pop the top node, kernel size, and number of filters from the stack
         pop_node = net['nodes'].popleft()
-        kernel_size = stacks['int'].pop()
+
+        if separate_ints:
+            kernel_size = stacks['sint'].pop()
+        else:
+            kernel_size = stacks['int'].pop()
+
         num_filters = stacks['int'].pop()
 
         # Define the kernel shape based on the number of input and output channels
@@ -350,6 +374,11 @@ class Instructions:
         if len(net['nodes']) < 1:
             return False
 
+        # Do ont allow redundant operations
+        # TODO: Euclidean norm is indepotent. Any advantage to multiple relu or softmax? Should I assume?
+        if net['nodes'][0].desc == desc:
+            return False
+
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
 
@@ -391,142 +420,3 @@ class Instructions:
     def normalize(dag, net):
         '''Normalize'''
         Instructions.process_torch_ops(dag, net, torch.nn.functional.normalize, "Normalize")
-
-    #########################
-    ### Matrix Scalar Ops ###
-    #########################
-
-    # @staticmethod
-    # def process_mat_scalar_ops(dag, net, stacks, fn, desc):
-    #     '''Pop the top tensor from the tensor stack and the top int from the int stack'''
-    #     # Do nothing if there aren't enough tensors in the stack
-    #     if len(net['nodes']) < 1:
-    #         return False
-    #
-    #     # Pop the top node and int from the stack
-    #     pop_node = net['nodes'].popleft()
-    #
-    #     # Create new node
-    #     node = Node(
-    #         shape=pop_node.shape,
-    #         layer=pop_node.layer + 1,
-    #         fn=fn,
-    #         parents=[pop_node],
-    #         desc=desc
-    #     )
-    #
-    #     # Add the new node to the graph
-    #     dag.add_edge(u=pop_node, v=node)
-    #
-    #     # Add new node to stack
-    #     net['nodes'].append(node)
-    #
-    #     return True
-    #
-    # @staticmethod
-    # def mat_add_int(dag, net, stacks):
-    #     '''Matrix Addition with Int'''
-    #     # Do nothing if there aren't enough ints in the stack
-    #     if len(stacks['int']) < 1:
-    #         return False
-    #
-    #     pop_int = stacks['int'].pop()
-    #     Instructions.process_mat_scalar_ops(dag, net, stacks, lambda x: torch.add(x, pop_int), "Mat_Add_Int")
-    #
-    # @staticmethod
-    # def mat_add_float(dag, net, stacks):
-    #     '''Matrix Addition with Float'''
-    #     # Do nothing if there aren't enough floats in the stack
-    #     if len(stacks['float']) < 1:
-    #         return False
-    #
-    #     pop_float = stacks['float'].pop()
-    #     Instructions.process_mat_scalar_ops(dag, net, stacks, lambda x: torch.add(x, pop_float), "Mat_Add_Float")
-    #
-    # @staticmethod
-    # def mat_mult_float(dag, net, stacks):
-    #     '''Matrix Multiplication with Float'''
-    #     # Do nothing if there aren't enough floats in the stack
-    #     if len(stacks['float']) < 1:
-    #         return False
-    #
-    #     pop_float = stacks['float'].pop()
-    #     Instructions.process_mat_scalar_ops(dag, net, stacks, lambda x: torch.mul(x, pop_float), "Mat_Mult_Float")
-    #
-    # ########################
-    # ####### Int Ops ########
-    # ########################
-    #
-    # @staticmethod
-    # def process_ints(stacks, fn):
-    #     '''Pop the top 2 ints from the int stack'''
-    #     # Do nothing if there aren't enough integers in the stack
-    #     if len(stacks['int']) < 2:
-    #         return False
-    #
-    #     fn(stacks['int'].pop(), stacks['int'].pop())
-    #
-    #     return True
-    #
-    # @staticmethod
-    # def add_int(stacks):
-    #     '''Add ints from int stack'''
-    #     Instructions.process_ints(stacks, lambda x, y: x + y)
-    #
-    # @staticmethod
-    # def mult_int(stacks):
-    #     '''Multiply ints from int stack'''
-    #     Instructions.process_ints(stacks, lambda x, y: x * y)
-    #
-    # @staticmethod
-    # def dup_int(stacks):
-    #     '''Duplicate the top int on the int stack'''
-    #     if len(stacks['int']) < 1:
-    #         return False
-    #     stacks['int'].append(stacks['int'][-1])
-    #
-    #     return True
-    #
-    # #########################
-    # ####### Float Ops #######
-    # #########################
-    #
-    # @staticmethod
-    # def process_floats(stacks, fn):
-    #     '''Pop the top 2 floats from the float stack'''
-    #     # Do nothing if there aren't enough floats in the stack
-    #     if len(stacks['float']) < 2:
-    #         return False
-    #
-    #     fn(stacks['float'].pop(), stacks['float'].pop())
-    #
-    #     return True
-    #
-    # @staticmethod
-    # def add_float(stacks):
-    #     '''Add floats from float stack'''
-    #     Instructions.process_floats(stacks, lambda x, y: x + y)
-    #
-    # @staticmethod
-    # def sub_float(stacks):
-    #     '''Subtract floats from float stack'''
-    #     Instructions.process_floats(stacks, lambda x, y: x - y)
-    #
-    # @staticmethod
-    # def mult_float(stacks):
-    #     '''Multiply floats from float stack'''
-    #     Instructions.process_floats(stacks, lambda x, y: x * y)
-    #
-    # @staticmethod
-    # def div_float(stacks):
-    #     '''Divide floats from float stack'''
-    #     Instructions.process_floats(stacks, lambda x, y: x / y)
-    #
-    # @staticmethod
-    # def dup_float(stacks):
-    #     '''Duplicate the top float on the float stack'''
-    #     if len(stacks['float']) < 1:
-    #         return False
-    #     stacks['float'].append(stacks['float'][-1])
-    #
-    #     return True

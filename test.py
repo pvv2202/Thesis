@@ -2,6 +2,8 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import gp
 import torch
+from interpreter import Interpreter
+from instructions import Instructions
 from gp import Population
 
 if __name__ == "__main__":
@@ -21,6 +23,24 @@ if __name__ == "__main__":
     # # Create data loaders for batching
     # train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True) # drop_last=True to ensure all batches are the same size
     # test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True) # drop_last=True to ensure all batches are the same size
+
+    '''FASHION MNIST'''
+    # # Define the transformation to apply to each image (convert to tensor and normalize)
+    # transform = transforms.Compose([
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.5,), (0.5,))  # Normalize grayscale images
+    # ])
+    #
+    # # Find device
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #
+    # # Load the Fashion MNIST training and test datasets
+    # train_dataset = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
+    # test_dataset = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+    #
+    # # Create data loaders for batching
+    # train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)  # drop_last=True to ensure all batches are the same size
+    # test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False)  # drop_last=True to ensure all batches are the same size
 
     '''CIFAR10'''
     # Define the transformation to apply to each image (convert to tensor and normalize)
@@ -57,7 +77,9 @@ if __name__ == "__main__":
 
 
     '''Example Network That Performs Well on CIFAR-10'''
-    # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
+    # interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True)
+    # instructions = Instructions(activation="relu")
+    # genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
     # genome.genome = ['matmul', 'flatten', 'maxpool2d', 'normalize', 'relu', 'conv2d', 'normalize', 'relu,' 'conv2d', 'maxpool2d', 'normalize', 'relu', 'conv2d', 'normalize', 'relu', 'conv2d', 'maxpool2d', 'normalize', 'relu', 'conv2d', 'normalize', 'relu', 'conv2d',
     #                  128, 128, 3, 128, 3, 64, 3, 64, 3, 32, 3, 32, 3]
     # # genome.genome = ['conv2d', 'maxpool2d', 'normalize', 'relu', 'conv2d', 'normalize', 'relu', 'conv2d', 'maxpool2d', 'normalize', 'relu', 'conv2d', 'normalize', 'relu', 'conv2d',
@@ -70,21 +92,27 @@ if __name__ == "__main__":
     # print(f"Fitness: {genome.fitness}")
 
     '''Individual Tests'''
-    # genome = gp.Genome(train=train_loader, test=test_loader, activation='relu')
+    # interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True)
+    # instructions = Instructions(activation="relu")
+    # genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
     # genome.genome = [
-    #     'flatten', 'mat_add_nodes', 'normalize', 256, 3, 64, 'conv2d', 1, 64, 4, 'mat_add', 'flatten', 4, 4, 1, 'normalize', 'matmul', 4, 'matmul', 3, 32, 'mat_add_nodes', 'conv2d', 'mat_add', 'matmul', 128, 'matmul', 'mat_add_nodes', 'normalize', 'mat_add', 'normalize', 'maxpool2d', 'normalize', 'normalize', 128, 16, 64, 'matmul', 16, 2, 'matmul_nodes', 8, 4, 'mat_add', 128, 'flatten', 'mat_add', 3, 'dup', 'maxpool2d', 'matmul'
+    #     'mat_add_nodes', 'conv2d', 'normalize', 'normalize', 'conv2d', 64, 4, 4, 'normalize', 'conv2d', 'mat_add_nodes',
+    #     3, 8, 'normalize', 3, 128, 'matmul_nodes', 'maxpool2d', 'conv2d', 128, 2, 'matmul', 'mat_add_nodes', 4, 5,
+    #     'conv2d', 'flatten', 4, 5, 1, 'normalize', 'matmul_nodes', 'mat_add_nodes', 4, 'mat_add', 128, 4,
+    #     'mat_add_nodes', 'dup', 8, 'conv2d', 16, 16, 32, 8, 'mat_add_nodes', 256, 16, 'flatten', 16, 'mat_add_nodes', 5,
+    #     'maxpool2d', 'matmul', 'conv2d'
     # ]
     # network = genome.transcribe()
     # print(network)
-    # network.fit(epochs=10)
+    # network.fit(epochs=1)
     # fitness = network.evaluate()
     # print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
-    pop = Population.load("pop.pkl")
-    # pop = gp.Population(size=2, num_initial_genes=50, train=train_loader, test=test_loader, activation="relu", auto_bias=True)
+    # pop = Population.load("pop.pkl")
+    pop = gp.Population(size=10, num_initial_genes=50, train=train_loader, test=test_loader, activation="relu", auto_bias=True, separate_ints=True)
     # pop.save("pop.pkl")
-    pop.run(generations=2, epochs=1, method='tournament', pool_size=8, param_limit=500000)
+    pop.run(generations=10, epochs=1, method='tournament', pool_size=4, param_limit=300000)
 
     for genome in pop.population:
         print(genome.fitness)

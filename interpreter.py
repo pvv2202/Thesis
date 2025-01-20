@@ -1,9 +1,11 @@
 import torch
 import utils
+import gp
 from collections import deque
 from instructions import Instructions
 from dag import *
 from utils import *
+from functions import *
 from network import Network
 
 # TODO: Maybe do the same with bias?
@@ -13,10 +15,14 @@ ACTIVE = ['matmul', 'conv2d']
 BIAS = ['matmul']
 
 class Interpreter:
-    '''Push Interpreter'''
-    def __init__(self, train, test, activation, auto_bias):
+    '''
+    Push Interpreter. By default, automatically adds relu and bias where applicable and
+    separates small vs. large integers
+    '''
+    def __init__(self, train, test, activation='relu', auto_bias=True, separate_ints=True):
         self.stacks = {
             'int': [], # Really just Natural numbers
+            'sint': [], # Small integers
             'float': [],
             'bool': [],
             'str': [],
@@ -36,6 +42,7 @@ class Interpreter:
         # TODO: Improve this. Right now you can specify a consistent activation function (default relu).
         self.activation = activation
         self.auto_bias = auto_bias
+        self.separate_ints = separate_ints
 
         # Get input/output shapes
         train_x, train_y = next(iter(train)) # Get example input/output
@@ -57,7 +64,13 @@ class Interpreter:
         print(genome)
         for gene in genome:
             if type(gene) == int:
-                self.stacks['int'].append(gene)
+                if self.separate_ints:
+                    if gene < gp.SINT_RANGE[1]:
+                        self.stacks['sint'].append(gene)
+                    else:
+                        self.stacks['int'].append(gene)
+                else:
+                    self.stacks['int'].append(gene)
             elif type(gene) == float:
                 self.stacks['float'].append(gene)
             elif type(gene) == bool:
@@ -78,7 +91,7 @@ class Interpreter:
             # Get next instruction
             instr = self.stacks['exec'].pop()
             # Execute instruction
-            added = self.instructions(dag, self.net, self.stacks, self.device, instr)
+            added = self.instructions(dag, self.net, self.stacks, self.device, instr, self.separate_ints)
 
             # Add bias, activation if specified. Rotate because we can have multiple branches.
             # The added node will always be the last element and we need to make sure bias and activation operate on that
@@ -86,11 +99,11 @@ class Interpreter:
                 # If auto bias is not None and instruction requires bias, add bias (mat_add) to stack
                 if self.auto_bias is not None and instr in BIAS:
                     self.net['nodes'].rotate(1)
-                    self.instructions(dag, self.net, self.stacks, self.device, 'mat_add')
+                    self.instructions(dag, self.net, self.stacks, self.device, 'mat_add', self.separate_ints)
                 # If activation is not None and instruction requires activation, add activation function to stack
                 if self.activation is not None and instr in ACTIVE:
                     self.net['nodes'].rotate(1)
-                    self.instructions(dag, self.net, self.stacks, self.device, self.activation)
+                    self.instructions(dag, self.net, self.stacks, self.device, self.activation, self.separate_ints)
 
 
             # if self.net['nodes'][-1].shape == None:
@@ -114,6 +127,7 @@ class Interpreter:
         '''Clear current data in interpreter'''
         self.stacks = {
             'int': [],
+            'sint': [],
             'float': [],
             'bool': [],
             'str': [],
@@ -153,7 +167,7 @@ class Interpreter:
             node = Node(
                 shape=(prod,),
                 layer=last_node.layer + 1,
-                fn=lambda x: torch.flatten(x, start_dim=1),
+                fn=flatten,
                 parents=[last_node],
                 desc="Flatten"
             )
@@ -169,7 +183,7 @@ class Interpreter:
         node = Node(
             shape=utils.mult_shape(last_node.shape, weights.shape),
             layer=last_node.layer + 1,
-            fn=torch.matmul,
+            fn=matmul,
             parents=[last_node],
             weight_id=len(self.net['params'])-1,
             desc="Matmul"

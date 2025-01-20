@@ -85,6 +85,10 @@ class Network:
             # Forward pass and compute
             with torch.no_grad():
                 y_pred = self.forward(x)
+                # print("Prediction:")
+                # print(torch.max(y_pred, -1))
+                # print("Actual:")
+                # print(y)
                 l = self.loss(y_pred, y, loss_fn)
                 # If invalid, just return inf, -inf
                 if type(l) == float:
@@ -94,7 +98,7 @@ class Network:
                 test_sum += len(y) # Should be a batch of labels
 
                 # Calculate accuracy
-                _, predictions = torch.max(y_pred, -1) # Should always be last dimension (hence -1)
+                _, predictions = torch.max(y_pred, -1) # Should always be last dimension (hence -1). Max, indices is the form
 
                 correct_predictions += (predictions == y).sum().item()
                 results[i] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
