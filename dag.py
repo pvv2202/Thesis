@@ -3,7 +3,7 @@ from collections import deque
 
 class Node:
     '''Node in a Directed, Acyclic Graph'''
-    def __init__(self, shape, layer, fn=None, parents=None, weight_id=None, desc=None):
+    def __init__(self, shape, layer, fn=None, parents=None, weight_id=None, desc=None, flops=0):
         self.shape = shape # Output shape of this node after functions are applied
         self.layer = layer
         self.fn = fn
@@ -11,6 +11,7 @@ class Node:
         self.weight_id = weight_id
         self.desc = desc
         self.tensor = None
+        self.flops = flops
 
     def execute(self, params, device):
         '''Execute the function on the input, store the result'''

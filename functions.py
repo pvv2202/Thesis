@@ -1,6 +1,10 @@
 import torch
 import torch.nn.functional as F
 
+'''
+Different functions used. Have to specify these to make instructions pickleable (lambda isn't)
+'''
+
 def matmul(x, y):
     return torch.matmul(x, y)
 

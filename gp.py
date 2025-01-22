@@ -203,7 +203,7 @@ class Population:
         for genome in self.population:
             genome.UMAD()
 
-    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=500000):
+    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000):
         '''Runs the population on the train and test data'''
         acc = []
         size = []
@@ -212,6 +212,7 @@ class Population:
             gen_acc = [] # Store accuracies for graphing
             gen_size = [] # Store sizes for graphing
             param_max = 0
+            flops_max = 0
             for genome in self.population:
                 gen_size.append(len(genome.genome))
                 network = genome.transcribe()
@@ -226,10 +227,11 @@ class Population:
                 # Train the network
                 network.fit(epochs=epochs)
 
-                # Evaluate the network, store results
+                # Evaluate the network, store results. Parameter count not used currently.
                 loss, accuracy, results = network.evaluate()
                 param_max = max(param_max, network.param_count)
-                genome.metrics = (loss, accuracy, network.param_count)
+                flops_max = max(flops_max, network.flops)
+                genome.metrics = (loss, accuracy, network.flops, network.param_count)
                 genome.results = results
 
                 # Update best genome
@@ -245,9 +247,9 @@ class Population:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-            # Update fitness using normalized param count
+            # Update fitness using normalized flops
             for genome in self.population:
-                p_norm = genome.metrics[2] / param_max # Just parameter count / max parameter count
+                p_norm = genome.metrics[2] / flops_max # Just flops / flops max
                 genome.fitness = (
                     # TODO: Normalization may not be good for loss. Probably too small
                     (1 - ALPHA) * genome.metrics[1] + ALPHA * p_norm, # Loss
@@ -282,7 +284,6 @@ class Population:
                                 capprops=dict(color='black'),
                                 boxprops=dict(facecolor='lavender', color='black'),
                                 flierprops=dict(markerfacecolor='green', marker='D'))
-
         plt.title('Box Plot of Size Over Generations')
         plt.xlabel('Generation')
         plt.ylabel('Size (Number of Genes)')

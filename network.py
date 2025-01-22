@@ -12,6 +12,21 @@ class Network:
         self.params = params
         self.device = device
         self.param_count = sum(p.numel() for p in self.params) # Number of elements across all parameter arrays
+        self.flops = self.calculate_flops()
+
+    def calculate_flops(self):
+        '''Calculate and return flops'''
+        flops = 0
+
+        #BFS
+        queue = deque()
+        queue.extend(self.dag.graph[self.dag.root])
+        while queue:
+            node = queue.popleft()
+            flops += node.flops
+            queue.extend(self.dag.graph[node]) # Add children to queue
+
+        return flops
 
     @profile
     def forward(self, x):
@@ -110,4 +125,4 @@ class Network:
         return total_loss, accuracy, results
 
     def __str__(self):
-        return self.dag.__str__() + '\n' + f"Parameters: {self.param_count}"
+        return self.dag.__str__() + '\n' + f"Parameters: {self.param_count}" + '\n' + f"FLOPs: {self.flops}"

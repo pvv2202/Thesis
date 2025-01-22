@@ -65,7 +65,7 @@ class Interpreter:
         for gene in genome:
             if type(gene) == int:
                 if self.separate_ints:
-                    if gene < gp.SINT_RANGE[1]:
+                    if gene <= gp.SINT_RANGE[1]:
                         self.stacks['sint'].append(gene)
                     else:
                         self.stacks['int'].append(gene)
@@ -154,7 +154,8 @@ class Interpreter:
                     layer=last_node.layer + 1,
                     fn=torch.unsqueeze,
                     parents=[last_node],
-                    desc="Unsqueeze"
+                    desc="Unsqueeze",
+                    flops=0
                 )
                 dag.add_edge(last_node, node)
                 last_node = node
@@ -169,7 +170,8 @@ class Interpreter:
                 layer=last_node.layer + 1,
                 fn=flatten,
                 parents=[last_node],
-                desc="Flatten"
+                desc="Flatten",
+                flops=0
             )
             dag.add_edge(last_node, node)
             last_node = node
@@ -180,13 +182,20 @@ class Interpreter:
         weights = torch.randn(last_shape[-1], self.output_shape[-1], requires_grad=True, device=self.device)
         self.net['params'].append(weights)
 
+        # Calculate flops depending on dimension
+        if len(last_node.shape) < 2:
+            flops = (2 * last_node.shape[-1] - 1) * weights.shape[-1]
+        else:
+            flops = (2 * last_node.shape[-1] * last_node.shape[-2] - 1) * weights.shape[-1]
+
         node = Node(
             shape=utils.mult_shape(last_node.shape, weights.shape),
             layer=last_node.layer + 1,
             fn=matmul,
             parents=[last_node],
             weight_id=len(self.net['params'])-1,
-            desc="Matmul"
+            desc="Matmul",
+            flops=flops
         )
 
         dag.add_edge(last_node, node)

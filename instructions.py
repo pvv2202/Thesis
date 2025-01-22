@@ -1,3 +1,4 @@
+import math
 import torch.nn.functional as F
 from functools import partial
 import utils
@@ -63,15 +64,21 @@ class Instructions:
         weights = torch.randn(new_shape, requires_grad=True, device=device)
         net['params'].append(weights) # Add weights to the parameters stack
 
+        # Calculate flops depending on dimension
+        if len(pop_shape) < 2:
+            flops = (2 * pop_shape[-1] - 1) * pop_int
+        else:
+            flops = (2 * pop_shape[-1] * pop_shape[-2] - 1) * pop_int
+
         # Create new node with the output shape of the matrix multiplication
-        shape = utils.mult_shape(pop_shape, new_shape)
         node = Node(
-            shape=shape,#utils.mult_shape(pop_shape, new_shape),
+            shape=utils.mult_shape(pop_shape, new_shape),
             layer=pop_node.layer + 1,
             fn=matmul,
             parents=[pop_node],
             weight_id=len(net['params']) - 1,
-            desc="Matmul"
+            desc="Matmul",
+            flops=flops
         )
 
         # Add the new node to the graph
@@ -97,13 +104,20 @@ class Instructions:
         pop_node1 = net['nodes'].popleft()
         pop_node2 = net['nodes'].popleft()
 
+        # Calculate flops depending on dimension
+        if len(pop_node1.shape) < 2:
+            flops = (2 * pop_node1.shape[-1] - 1) * pop_node2.shape[-1]
+        else:
+            flops = (2 * pop_node1.shape[-1] * pop_node1.shape[-2] - 1) * pop_node2.shape[-1]
+
         # Create new node
         node = Node (
             shape=utils.mult_shape(pop_node1.shape, pop_node2.shape), # Get the shape of the resulting tensor
             layer=max(pop_node1.layer, pop_node2.layer) + 1, # Take the max layer of the two nodes and add 1
             fn=matmul,
             parents=[pop_node1, pop_node2],
-            desc="Matmul_Nodes"
+            desc="Matmul_Nodes",
+            flops=flops
         )
 
         # Add whichever node is lower in the graph so that both will have been processed.
@@ -119,6 +133,7 @@ class Instructions:
     #########################
     ###### Convolution ######
     #########################
+    # TODO: Flops for these will be dependent on stride and padding if I make that variable as well
 
     @staticmethod
     def maxpool2d(dag, net):
@@ -131,7 +146,7 @@ class Instructions:
         if len(net['nodes'][0].shape) < 3:
             return False
 
-        # Check if maxpooling is possible.
+        # Check if max pooling is possible.
         if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2), stride=2):
             return False
 
@@ -141,13 +156,16 @@ class Instructions:
         # Define partial function
         max_pool_partial = partial(max_pool, kernel_size=(2,2), stride=None, padding=0)
 
+        new_shape = utils.maxpool2d_shape(pop_node.shape, (2, 2), stride=2)
+
         # Create new node
         node = Node(
-            shape=utils.maxpool2d_shape(pop_node.shape, (2, 2), stride=2),
+            shape=new_shape,
             layer=pop_node.layer + 1,
             fn=max_pool_partial, # For now, hardcode kernel size and stride
             parents=[pop_node],
-            desc="Maxpool2d"
+            desc="Maxpool2d",
+            flops=math.prod(new_shape) * (2 * 2 - 1)  # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output elements * comparisons/element
         )
 
         # Add the new node to the graph
@@ -188,7 +206,8 @@ class Instructions:
             layer=pop_node.layer + 1,
             fn=flatten_partial,
             parents=[pop_node],
-            desc="Flatten"
+            desc="Flatten",
+            flops=0
         )
 
         # Add the new node to the graph
@@ -202,7 +221,7 @@ class Instructions:
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod
     def conv2d(dag, net, stacks, device, separate_ints):
-        '''2D Convolution'''
+        '''2D Convolution. Just uses PyTorch's conv2d. A bunch of code here but most is just checking for no-op'''
         # First check we have enough nodes and integers
         if separate_ints:
             # Do nothing if there aren't enough nodes or integers (small and normal) in the stack
@@ -258,13 +277,16 @@ class Instructions:
         # Define partial convolution function
         conv2d_partial = partial(conv2d, kernel=kernel, bias=bias, stride=1, padding='same', dilation=1)
 
+        new_shape = utils.conv2d_shape(pop_node.shape, kernel.shape)
+
         # TODO: Add different padding options?
         node = Node(
-            shape=utils.conv2d_shape(pop_node.shape, kernel.shape),
+            shape=new_shape,
             layer=pop_node.layer + 1,
             fn=conv2d_partial,
             parents=[pop_node],
-            desc="Conv2d"
+            desc="Conv2d",
+            flops=(in_channels * (kernel_size**2) * 2 - 1) * math.prod(new_shape) # k * k multiplications, k * k - 1 additions for each output element.
         )
         dag.add_edge(u=pop_node, v=node)
 
@@ -297,7 +319,8 @@ class Instructions:
             fn=mat_add,
             parents=[pop_node],
             weight_id=len(net['params']) - 1,
-            desc="Mat_Add"
+            desc="Mat_Add",
+            flops=math.prod(pop_node.shape)
         )
         dag.add_edge(u=pop_node, v=node) # Edge between popped node and new node
 
@@ -327,7 +350,8 @@ class Instructions:
             layer=max(pop_node1.layer, pop_node2.layer) + 1, # Take the max layer of the two nodes and add 1
             fn=mat_add,
             parents=[pop_node1, pop_node2],
-            desc="Mat_Add_Nodes"
+            desc="Mat_Add_Nodes",
+            flops=math.prod(pop_node1.shape)
         )
         # dag.add_edge(u=pop_node1, v=node) # TODO: Think about how to improve this so the graph representation makes more sense?
         # Add whichever node is lower in the graph so that both will have been processed.
@@ -356,7 +380,8 @@ class Instructions:
             layer=ref.layer,
             fn=dup,
             parents=[ref],
-            desc="Dup"
+            desc="Dup",
+            flops=0
         )
         dag.add_edge(u=ref, v=node)
         net['nodes'].append(node)
@@ -374,8 +399,8 @@ class Instructions:
         if len(net['nodes']) < 1:
             return False
 
-        # Do ont allow redundant operations
         # TODO: Euclidean norm is indepotent. Any advantage to multiple relu or softmax? Should I assume?
+        # Don't allow redundant operations
         if net['nodes'][0].desc == desc:
             return False
 
@@ -388,7 +413,8 @@ class Instructions:
             layer=pop_node.layer + 1,
             fn=fn,
             parents=[pop_node],
-            desc=desc
+            desc=desc,
+            flops=math.prod(pop_node.shape) # TODO: For now just use the shape. Can expand on this later
         )
 
         # Add the new node to the graph
