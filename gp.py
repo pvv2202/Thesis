@@ -203,7 +203,7 @@ class Population:
         for genome in self.population:
             genome.UMAD()
 
-    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000):
+    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000):
         '''Runs the population on the train and test data'''
         acc = []
         size = []
@@ -223,6 +223,12 @@ class Population:
                     del genome.genome[i]
                     network = genome.transcribe()
 
+                # Delete random genes until the flops count is below the limit
+                while network.flops > flops_limit:
+                    i = random.randint(0, max(0, len(genome.genome) - 1))
+                    del genome.genome[i]
+                    network = genome.transcribe()
+
                 print(network)
                 # Train the network
                 network.fit(epochs=epochs)
@@ -236,7 +242,7 @@ class Population:
 
                 # Update best genome
                 if accuracy > best_genome[1]:
-                    best_genome = (genome, accuracy)
+                    best_genome = (copy.deepcopy(genome), accuracy)
 
                 gen_acc.append(accuracy)
                 print(f"Genome Accuracy: {accuracy}")

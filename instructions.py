@@ -441,8 +441,13 @@ class Instructions:
     #     '''Softmax Activation Function'''
     #     Instructions.process_torch_ops(dag, net, lambda x: torch.softmax(x, dim=1), "Softmax")
 
-    # Others
-    @staticmethod
-    def normalize(dag, net):
-        '''Normalize'''
-        Instructions.process_torch_ops(dag, net, torch.nn.functional.normalize, "Normalize")
+    # # Normalization Functions
+    # @staticmethod
+    # def l2_norm(dag, net):
+    #     '''L2 Normalize'''
+    #     Instructions.process_torch_ops(dag, net, torch.nn.functional.normalize, "L2 Norm")
+    #
+    # @staticmethod
+    # def batch_norm(dag, net):
+    #     '''Batch Normalization'''
+

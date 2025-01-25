@@ -22,3 +22,8 @@ def conv2d(x, kernel, bias, stride=1, padding='same', dilation=1):
 
 def dup(x):
     return x
+
+# def batch_norm(x, gamma, beta, eps=1e-5, momentum=0.1, training=True):
+#     if training:
+
+
