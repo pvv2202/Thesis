@@ -83,10 +83,6 @@ class Network:
                 # Forward pass and compute loss
                 l = self.loss(y_pred, y, loss_fn)
 
-                # If the network is invalid, return
-                if isinstance(l, float):
-                    return
-
                 # Backpropagation
                 l.backward()
 
@@ -97,11 +93,12 @@ class Network:
                 # TODO: Hard-coded threshold for now
                 if drought and i == len(self.train) // 4:
                     if epoch % 4 == 0:
-                        total_loss, accuracy, _ = self.evaluate()
+                        loss, accuracy, results = self.evaluate()
                         if accuracy <= 0.15:
-                            return
+                            return (loss, accuracy, results)
 
             print(f"Epoch {epoch + 1}/{epochs} finished.")
+            return None
 
     def evaluate(self, loss_fn=torch.nn.functional.cross_entropy):
         '''Evaluate the model on the test set. Returns loss, accuracy tuple'''

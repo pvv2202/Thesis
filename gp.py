@@ -14,7 +14,7 @@ INT_VALS = [8, 16, 32, 64, 128, 256]
 ADD_RATE = 0.18
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 # TODO: Experiment with alpha
-ALPHA = 0.5 # Used for loss function with parameter count. Between 0 and 1
+ALPHA = 0.2 # Used for loss function with parameter count. Between 0 and 1. Higher means we weigh parameter count more
 
 class Genome:
     '''Genome of a Push Program'''
@@ -231,10 +231,14 @@ class Population:
 
                 print(network)
                 # Train the network
-                network.fit(epochs=epochs)
+                res = network.fit(epochs=epochs)
 
                 # Evaluate the network, store results. Parameter count not used currently.
-                loss, accuracy, results = network.evaluate()
+                if res is None:
+                    loss, accuracy, results = network.evaluate()
+                else:
+                    loss, accuracy, results = res
+
                 param_max = max(param_max, network.param_count)
                 flops_max = max(flops_max, network.flops)
                 genome.metrics = (loss, accuracy, network.flops, network.param_count)
