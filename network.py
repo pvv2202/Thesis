@@ -14,6 +14,7 @@ class Network:
         self.param_count = sum(p.numel() for p in self.params) # Number of elements across all parameter arrays
         self.flops = self.calculate_flops()
 
+
     def calculate_flops(self):
         '''Calculate and return flops'''
         flops = 0
@@ -61,13 +62,21 @@ class Network:
 
         return loss(y_pred, y)
 
-    def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam):
+    def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=True):
         '''Fit the model'''
         optimizer = optimizer_class(self.params, lr=learning_rate)
+        dead = False
 
         for epoch in range(epochs):
             # Iterate over the training data, use tqdm to show a progress bar
-            for x, y in tqdm(self.train, desc=f"Epoch {epoch + 1}/{epochs}", unit='batch', colour='green'):
+            progress_bar = tqdm(
+                self.train,
+                desc=f"Epoch {epoch + 1}/{epochs}",
+                unit='batch',
+                colour='green'
+            )
+
+            for i, (x, y) in enumerate(progress_bar):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 y_pred = self.forward(x)
@@ -84,6 +93,17 @@ class Network:
 
                 # Update parameters
                 optimizer.step()
+
+                # If drought is on and we've trained on 25%, test to see if we stop here
+                # TODO: Hard-coded threshold for now
+                if drought and i == len(self.train) // 4:
+                    if epoch % 4 == 0:
+                        total_loss, accuracy, _ = self.evaluate()
+                        if accuracy <= 0.15:
+                            return
+
+            if dead:
+                break
 
             print(f"Epoch {epoch + 1}/{epochs} finished.")
 
