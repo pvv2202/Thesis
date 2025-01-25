@@ -65,7 +65,6 @@ class Network:
     def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=True):
         '''Fit the model'''
         optimizer = optimizer_class(self.params, lr=learning_rate)
-        dead = False
 
         for epoch in range(epochs):
             # Iterate over the training data, use tqdm to show a progress bar
@@ -101,9 +100,6 @@ class Network:
                         total_loss, accuracy, _ = self.evaluate()
                         if accuracy <= 0.15:
                             return
-
-            if dead:
-                break
 
             print(f"Epoch {epoch + 1}/{epochs} finished.")
 
