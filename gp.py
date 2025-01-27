@@ -203,7 +203,7 @@ class Population:
         for genome in self.population:
             genome.UMAD()
 
-    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000):
+    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, drought=False, increase_epochs=False):
         '''Runs the population on the train and test data'''
         acc = []
         size = []
@@ -230,8 +230,15 @@ class Population:
                     network = genome.transcribe()
 
                 print(network)
+
+                # Determine value to pass for generation
+                if increase_epochs:
+                    generation = gen_num/generations # Pass the generation number as a fraction
+                else:
+                    generation = None
+
                 # Train the network
-                res = network.fit(epochs=epochs)
+                res = network.fit(epochs=epochs, drought=drought, generation=generation)
 
                 # Evaluate the network, store results. Parameter count not used currently.
                 if res is None:

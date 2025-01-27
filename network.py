@@ -2,6 +2,8 @@ import torch
 from collections import deque
 from line_profiler import profile
 from tqdm import tqdm
+import math
+import random
 
 class Network:
     def __init__(self, dag, train, test, params, device):
@@ -62,9 +64,13 @@ class Network:
 
         return loss(y_pred, y)
 
-    def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=True):
+    def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=True, generation=None):
         '''Fit the model'''
         optimizer = optimizer_class(self.params, lr=learning_rate)
+        train = 1
+        if generation:
+            train, epochs = math.modf(epochs*generation) # Split epochs*generations into decimal (train) and integer (epochs) components
+            epochs = int(epochs)
 
         for epoch in range(epochs):
             # Iterate over the training data, use tqdm to show a progress bar
@@ -89,15 +95,19 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
+                # Iteratively increase the amount we train
+                if generation:
+                    # If we're below the threshold and we're on the last epoch, return
+                    if i/len(self.train) <= train <= (i+1)/len(self.train) and epoch == epochs-1:
+                        return None
+
                 # If drought is on and we've trained on 25%, test to see if we stop here
                 # TODO: Hard-coded threshold for now
                 if drought and i == len(self.train) // 4:
-                    if epoch % 4 == 0:
-                        loss, accuracy, results = self.evaluate()
-                        if accuracy <= 0.15:
-                            return (loss, accuracy, results)
+                    loss, accuracy, results = self.evaluate()
+                    if accuracy <= 0.15:
+                        return (loss, accuracy, results)
 
-            print(f"Epoch {epoch + 1}/{epochs} finished.")
             return None
 
     def evaluate(self, loss_fn=torch.nn.functional.cross_entropy):
