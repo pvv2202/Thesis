@@ -67,19 +67,13 @@ class Network:
     def fit(self, epochs=3, learning_rate=0.001, momentum = 0.9, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.SGD, drought=False, generation=None):
         '''Fit the model'''
         optimizer = optimizer_class(self.params, lr=learning_rate, momentum=momentum)
-        train = 1
+        train_fraction = 1
         if generation:
-            train, epochs = math.modf(epochs*generation) # Split epochs*generations into decimal (train) and integer (epochs) components
-            epochs = int(epochs)
+            train_fraction = epochs*generation # Get fraction of data we want to train with
 
         for epoch in range(epochs):
             # Iterate over the training data, use tqdm to show a progress bar
-            progress_bar = tqdm(
-                self.train,
-                desc=f"Epoch {epoch + 1}/{epochs}",
-                unit='batch',
-                colour='green'
-            )
+            progress_bar = tqdm(self.train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch", colour="green")
 
             for i, (x, y) in enumerate(progress_bar):
                 x, y = x.to(self.device), y.to(self.device)
@@ -95,10 +89,13 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
+                if (i + 1) / len(self.train) >= 0.1:
+                    return None
+
                 # Iteratively increase the amount we train
                 if generation:
-                    # If we're below the threshold and we're on the last epoch, return
-                    if i/len(self.train) <= train <= (i+1)/len(self.train) and epoch == epochs-1:
+                    fraction_done = (i + 1) / len(self.train)
+                    if fraction_done >= train_fraction:
                         return None
 
                 # If drought is on and we've trained on 25%, test to see if we stop here

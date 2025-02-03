@@ -268,9 +268,11 @@ class Population:
             for genome in self.population:
                 p_norm = genome.metrics[2] / flops_max # Just flops / flops max
                 genome.fitness = (
-                    # TODO: Normalization may not be good for loss. Probably too small
-                    (1 - ALPHA) * genome.metrics[1] + ALPHA * p_norm, # Loss
-                    (1 - ALPHA) * genome.metrics[0] - ALPHA * p_norm, # Accuracy
+                    # # TODO: Normalization may not be good for loss. Probably too small
+                    # (1 - ALPHA) * genome.metrics[1] + ALPHA * p_norm, # Loss
+                    # (1 - ALPHA) * genome.metrics[0] - ALPHA * p_norm, # Accuracy
+                    genome.metrics[1],
+                    genome.metrics[0]
                 )
 
             acc.append(gen_acc)

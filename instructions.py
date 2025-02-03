@@ -314,7 +314,7 @@ class Instructions:
 
         # Create weights of same shape as popped node
         weights = torch.empty(pop_node.shape, requires_grad=True, device=device)
-        init.xavier_uniform_(weights)
+        init.zeros_(weights)
         net['params'].append(weights) # Add weights to the parameters stack
 
         # Create new node
