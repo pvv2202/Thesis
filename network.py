@@ -64,9 +64,9 @@ class Network:
 
         return loss(y_pred, y)
 
-    def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=True, generation=None):
+    def fit(self, epochs=3, learning_rate=0.001, momentum = 0.9, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.SGD, drought=False, generation=None):
         '''Fit the model'''
-        optimizer = optimizer_class(self.params, lr=learning_rate)
+        optimizer = optimizer_class(self.params, lr=learning_rate, momentum=momentum)
         train = 1
         if generation:
             train, epochs = math.modf(epochs*generation) # Split epochs*generations into decimal (train) and integer (epochs) components

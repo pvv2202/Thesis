@@ -5,6 +5,7 @@ import utils
 from dag import *
 from functions import *
 import inspect
+import torch.nn.init as init
 
 # TODO: Add a bool stack for things like bias in conv
 
@@ -61,7 +62,8 @@ class Instructions:
         new_shape = (pop_shape[-1], pop_int)
 
         # Create weights
-        weights = torch.randn(new_shape, requires_grad=True, device=device)
+        weights = torch.empty(new_shape, requires_grad=True, device=device)
+        init.xavier_uniform_(weights)
         net['params'].append(weights) # Add weights to the parameters stack
 
         # Calculate flops depending on dimension
@@ -266,10 +268,12 @@ class Instructions:
 
         # Define the kernel shape based on the number of input and output channels
         in_channels = pop_node.shape[0]
-        kernel = torch.randn(num_filters, in_channels, kernel_size, kernel_size, requires_grad=True, device=device)  # (out_channels, in_channels, height, width)
+        kernel = torch.empty(num_filters, in_channels, kernel_size, kernel_size, requires_grad=True, device=device)  # (out_channels, in_channels, height, width)
+        init.xavier_uniform_(kernel)
 
         # Bias term for each filter (output channel)
-        bias = torch.randn(num_filters, requires_grad=True, device=device)
+        bias = torch.empty(num_filters, requires_grad=True, device=device)
+        init.zeros_(bias)
 
         # Add the kernel and bias to the 'params' stack
         net['params'].extend([kernel, bias])
@@ -309,7 +313,8 @@ class Instructions:
         pop_node = net['nodes'].popleft()
 
         # Create weights of same shape as popped node
-        weights = torch.randn(pop_node.shape, requires_grad=True, device=device)
+        weights = torch.empty(pop_node.shape, requires_grad=True, device=device)
+        init.xavier_uniform_(weights)
         net['params'].append(weights) # Add weights to the parameters stack
 
         # Create new node
