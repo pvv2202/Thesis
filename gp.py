@@ -264,14 +264,16 @@ class Population:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-            # Update fitness using normalized flops
-            for genome in self.population:
-                p_norm = genome.metrics[2] / flops_max # Just flops / flops max
-                genome.fitness = (
-                    # TODO: Normalization may not be good for loss. Probably too small
-                    (1 - ALPHA) * genome.metrics[1] + ALPHA * p_norm, # Loss
-                    (1 - ALPHA) * genome.metrics[0] - ALPHA * p_norm, # Accuracy
-                )
+            # # Update fitness using normalized flops
+            # for genome in self.population:
+            #     p_norm = genome.metrics[2] / flops_max # Just flops / flops max
+            #     genome.fitness = (
+            #         # TODO: Normalization may not be good for loss. Probably too small
+            #         (1 - ALPHA) * genome.metrics[1] + ALPHA * p_norm, # Loss
+            #         (1 - ALPHA) * genome.metrics[0] - ALPHA * p_norm, # Accuracy
+            #     )
+
+                genome.fitness = (genome.metrics[1], genome.metrics[0])
 
             acc.append(gen_acc)
             size.append(gen_size)

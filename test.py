@@ -8,19 +8,19 @@ from gp import Population
 
 if __name__ == "__main__":
     '''MNIST'''
-    # Define the transformation to apply to each image (convert to tensor and normalize)
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize((0.5,), (0.5,))])
-
-    # Find device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Load the MNIST training and test datasets
-    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-
-    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True) # drop_last=True to ensure all batches are the same size
-    test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True) # drop_last=True to ensure all batches are the same size
+    # # Define the transformation to apply to each image (convert to tensor and normalize)
+    # transform = transforms.Compose([transforms.ToTensor(),
+    #                                 transforms.Normalize((0.5,), (0.5,))])
+    #
+    # # Find device
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #
+    # # Load the MNIST training and test datasets
+    # train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    # test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    #
+    # train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True) # drop_last=True to ensure all batches are the same size
+    # test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False, drop_last=True) # drop_last=True to ensure all batches are the same size
 
     '''FASHION MNIST'''
     # # Define the transformation to apply to each image (convert to tensor and normalize)
@@ -41,23 +41,23 @@ if __name__ == "__main__":
     # test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False)  # drop_last=True to ensure all batches are the same size
 
     '''CIFAR10'''
-    # # Define the transformation to apply to each image (convert to tensor and normalize)
-    # # CIFAR-10 images are RGB (3 channels), so normalization should be applied across all 3 channels
-    # transform = transforms.Compose([
-    #     transforms.ToTensor(),
-    #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize R, G, B channels
-    # ])
-    #
-    # # Find device
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #
-    # # Load the CIFAR-10 training and test datasets
-    # train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-    # test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-    #
-    # # Create data loaders for batching
-    # train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)  # drop_last=True to ensure all batches are the same size
-    # test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False)  # drop_last=True to ensure all batches are the same size
+    # Define the transformation to apply to each image (convert to tensor and normalize)
+    # CIFAR-10 images are RGB (3 channels), so normalization should be applied across all 3 channels
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize R, G, B channels
+    ])
+
+    # Find device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load the CIFAR-10 training and test datasets
+    train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+
+    # Create data loaders for batching
+    train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)  # drop_last=True to ensure all batches are the same size
+    test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False)  # drop_last=True to ensure all batches are the same size
 
     '''Example Network That Performs Well on MNIST'''
     # genome = gp.Genome(train=train_loader, test=test_loader, activation=torch.softmax)
@@ -90,27 +90,25 @@ if __name__ == "__main__":
     # print(f"Fitness: {genome.fitness}")
 
     '''Individual Tests'''
-    # interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True)
+    # interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True, separate_ints=True)
     # instructions = Instructions(activation="relu")
     # genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
     # genome.genome = [
-    #     'mat_add_nodes', 'conv2d', 'normalize', 'normalize', 'conv2d', 64, 4, 4, 'normalize', 'conv2d', 'mat_add_nodes',
-    #     3, 8, 'normalize', 3, 128, 'matmul_nodes', 'maxpool2d', 'conv2d', 128, 2, 'matmul', 'mat_add_nodes', 4, 5,
-    #     'conv2d', 'flatten', 4, 5, 1, 'normalize', 'matmul_nodes', 'mat_add_nodes', 4, 'mat_add', 128, 4,
-    #     'mat_add_nodes', 'dup', 8, 'conv2d', 16, 16, 32, 8, 'mat_add_nodes', 256, 16, 'flatten', 16, 'mat_add_nodes', 5,
-    #     'maxpool2d', 'matmul', 'conv2d'
+    #     'flatten', 32, 'flatten', 'mat_add_nodes', 'flatten', 'matmul_nodes', 'matmul', 'mat_add_nodes', 'matmul_nodes',
+    #     1, 4, 'mat_add_nodes', 2, 'flatten', 'dup', 'conv2d', 2, 'matmul_nodes', 'matmul', 'mat_add', 'mat_add_nodes',
+    #     256, 'dup', 'conv2d', 1, 'conv2d', 'dup', 32, 128, 3, 4
     # ]
     # network = genome.transcribe()
     # print(network)
-    # network.fit(epochs=1)
+    # network.fit(epochs=10)
     # fitness = network.evaluate()
     # print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
-    # pop = Population.load("pop.pkl")
+    pop = Population.load("pop.pkl")
     pop = gp.Population(
         size=75, # Population size (number of individuals)
-        num_initial_genes=50, # Number of genes to start with for each individual
+        num_initial_genes=100, # Number of genes to start with for each individual
         train=train_loader, # Training data
         test=test_loader, # Testing data
         activation="relu", # Activation function to use (of None, no default activation function is used)
@@ -121,12 +119,12 @@ if __name__ == "__main__":
     pop.run(
         generations=50, # Number of generations to run this population for
         epochs=1, # Number of epochs to train each network for
-        method='epsilon-lexicase', # Selection method
+        method='epsilon-lexicase', # Selection methodnb
         pool_size=75, # Number of individuals to select from the population for each selection into the next generation
-        param_limit=5000000, # Maximum number of parameters allowed in a network
-        flops_limit=500000000, # Maximum number of FLOPs allowed in a network
-        drought=True, # Whether to use a drought mechanism that kills bad networks off early
-        increase_epochs=True # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
+        param_limit=500000000, # Maximum number of parameters allowed in a network
+        flops_limit=50000000000, # Maximum number of FLOPs allowed in a network
+        drought=False, # Whether to use a drought mechanism that kills bad networks ofb f early
+        increase_epochs=False # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
     )
 
     for genome in pop.population:

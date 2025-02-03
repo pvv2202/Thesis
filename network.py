@@ -64,13 +64,13 @@ class Network:
 
         return loss(y_pred, y)
 
-    def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=True, generation=None):
+    def fit(self, epochs=3, learning_rate=0.01, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=False, generation=None):
         '''Fit the model'''
         optimizer = optimizer_class(self.params, lr=learning_rate)
-        train = 1
+        train_frac = 1
         if generation:
-            train, epochs = math.modf(epochs*generation) # Split epochs*generations into decimal (train) and integer (epochs) components
-            epochs = int(epochs)
+            train_frac = epochs*generation
+            print(train_frac)
 
         for epoch in range(epochs):
             # Iterate over the training data, use tqdm to show a progress bar
@@ -95,11 +95,18 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
+                # TODO: Temporary downsampling test
+                fraction_done = (i + 1) / len(self.train) + epoch  # Amount we've done in this epoch + epoch
+                if fraction_done > 0.1:
+                    return
+
                 # Iteratively increase the amount we train
                 if generation:
-                    # If we're below the threshold and we're on the last epoch, return
-                    if i/len(self.train) <= train <= (i+1)/len(self.train) and epoch == epochs-1:
-                        return None
+                    # If we're above the threshold, return
+                    fraction_done = (i + 1) / len(self.train) + epoch # Amount we've done in this epoch + epoch
+                    if fraction_done >= train_frac:
+                        print(f"Stopping epoch {epoch + 1} early at {fraction_done:.2f} of the data.")
+                        return  # done training
 
                 # If drought is on and we've trained on 25%, test to see if we stop here
                 # TODO: Hard-coded threshold for now
@@ -108,7 +115,7 @@ class Network:
                     if accuracy <= 0.15:
                         return (loss, accuracy, results)
 
-            return None
+        return None
 
     def evaluate(self, loss_fn=torch.nn.functional.cross_entropy):
         '''Evaluate the model on the test set. Returns loss, accuracy tuple'''
