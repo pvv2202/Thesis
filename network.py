@@ -4,6 +4,8 @@ from line_profiler import profile
 from tqdm import tqdm
 import math
 import random
+import networkx as nx
+import matplotlib.pyplot as plt
 
 class Network:
     def __init__(self, dag, train, test, params, device):
@@ -15,7 +17,6 @@ class Network:
         self.device = device
         self.param_count = sum(p.numel() for p in self.params) # Number of elements across all parameter arrays
         self.flops = self.calculate_flops()
-
 
     def calculate_flops(self):
         '''Calculate and return flops'''
@@ -89,7 +90,7 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
-                if (i + 1) / len(self.train) >= 0.1:
+                if (i + 1) / len(self.train) >= 0.01:
                     return None
 
                 # Iteratively increase the amount we train
@@ -143,6 +144,35 @@ class Network:
         print(f'Test set: Loss: {total_loss / len(self.test)}, Accuracy: {accuracy * 100:.2f}%')
 
         return total_loss, accuracy, results
+
+    def visualize(self):
+        # Create the graph
+        G = nx.DiGraph()  # Use DiGraph for directed edges
+        for node in self.dag.graph.keys():
+            G.add_node((node.desc, node.shape), layer=node.layer)
+
+        directed_edges = []
+        parents = []
+        for node, edges in self.dag.graph.items():
+            for edge in edges:
+                directed_edges.append(((node.desc, node.shape), (edge.desc, edge.shape)))
+            if node.parents is not None:
+                for parent in node.parents:
+                    parents.append(((node.desc, node.shape), (parent.desc, parent.shape)))
+
+        # Add edges to the graph
+        G.add_edges_from(directed_edges)
+        G.add_edges_from(parents)
+
+        pos = nx.multipartite_layout(G, subset_key="layer")
+
+        plt.figure(figsize=(len(self.dag.graph.keys()), len(self.dag.graph.keys())))
+        nx.draw(G, pos, with_labels=True, node_color="lightblue", node_size=5000, edge_color="black", font_size=10)
+        nx.draw_networkx_edges(G, pos, edgelist=directed_edges, edge_color="black", width=3, style="solid")
+        nx.draw_networkx_edges(G, pos, edgelist=parents, edge_color="red", width=1, style="dashed")
+
+        plt.title("Layered Computation Graph")
+        plt.show()
 
     def __str__(self):
         return self.dag.__str__() + '\n' + f"Parameters: {self.param_count}" + '\n' + f"FLOPs: {self.flops}"
