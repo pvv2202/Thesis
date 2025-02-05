@@ -94,7 +94,6 @@ if __name__ == "__main__":
     instructions = Instructions(activation="relu")
     genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
     genome.genome = [
-       # 'conv2d', 64, 3
         32, 128, 5, 3, 'dup', 1, 32, 'maxpool2d', 'matmul_nodes', 'dup', 'maxpool2d', 2, 5, 4, 128, 'dup',
          'matmul_nodes', 'dup', 128, 1, 'dup', 4, 'matmul', 128, 8, 'mat_add_nodes', 2, 128, 2, 4, 'mat_add',
          'maxpool2d', 'mat_add', 'mat_add', 'flatten', 'maxpool2d', 8, 'matmul', 'conv2d', 128, 'mat_add_nodes', 'dup',
@@ -104,7 +103,7 @@ if __name__ == "__main__":
         # 'conv2d','conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 512, 512, 512, 512, 256, 256, 256, 256, 128, 128, 128, 128, 64, 64, 64, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
     ]
     network = genome.transcribe()
-    network.visualize()
+    # network.visualize()
     print(network)
     network.fit(epochs=1)
     fitness = network.evaluate()

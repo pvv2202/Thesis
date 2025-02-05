@@ -1,4 +1,5 @@
 import torch
+import heapq
 from collections import deque
 
 class Node:
@@ -17,6 +18,11 @@ class Node:
         '''Execute the function on the input, store the result'''
         # Do nothing if no function or parents have no tensor
         if self.fn is None or any(parent.tensor is None for parent in self.parents):
+            print(self.layer)
+            for parent in self.parents:
+                print(parent.layer)
+                print(parent.desc)
+                print(parent.tensor)
             return self.tensor
 
         parent_tensors = [parent.tensor for parent in self.parents]
@@ -75,22 +81,29 @@ class DAG:
 
     def __str__(self):
         '''String representation of the DAG'''
+        heap = [] # Min heap (by layer) for the children of the root
+        result = [] # List of strings to store the result
+        layer_content = [] # Current layer content (to print by layer)
+        count = 0  # Tie-breaker counter. Otherwise we get an error trying to compare nodes
         curr_layer = 0
-        queue = deque([self.root])
-        result = []
-        layer_content = []
+        for child in self.graph[self.root]:
+            # Push a tuple of (layer, counter, node) into the heap
+            heapq.heappush(heap, (child.layer, count, child))
+            count += 1
 
-        while queue:
-            node = queue.popleft()
-            queue.extend(self.graph[node])
-
+        # Pop nodes in order of increasing layer
+        while heap:
+            _, _, node = heapq.heappop(heap)
             if node.layer > curr_layer:
                 result.append(" ".join(layer_content))  # Join all nodes in the current layer
                 layer_content = []
                 curr_layer = node.layer
 
-            # Add the current node to the current layer's content
             layer_content.append(f'Layer {node.layer}: {node.shape}; Fn: {node.desc}')
+
+            for child in self.graph[node]:
+                heapq.heappush(heap, (child.layer, count, child))
+                count += 1
 
         # Append any remaining content from the last layer
         if layer_content:

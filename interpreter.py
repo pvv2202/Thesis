@@ -178,7 +178,6 @@ class Interpreter:
             last_node = node
 
         last_shape = last_node.shape
-
         # Add node that projects to the output shape. Need matrix. Result should be output_shape[-1]
         weights = torch.empty(last_shape[-1], self.output_shape[-1], requires_grad=True, device=self.device)
         init.xavier_uniform_(weights)

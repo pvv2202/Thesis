@@ -4,6 +4,7 @@ from line_profiler import profile
 from tqdm import tqdm
 import math
 import random
+import heapq
 import networkx as nx
 import matplotlib.pyplot as plt
 
@@ -35,24 +36,34 @@ class Network:
     @profile
     def forward(self, x):
         '''Forward pass through the graph'''
-        # Load tensor into initial node
+        # Load tensor into the root node
         self.dag.root.tensor = x
         out = self.dag.root
-        # BFS
-        queue = deque()
-        queue.extend(self.dag.graph[self.dag.root]) # Initialize to be root has no function
-        while queue:
-            node = queue.popleft()
-            queue.extend(self.dag.graph[node]) # Add children to queue
-            node.execute(self.params, self.device) # Execute the function at node
+
+        # Min heap (by layer) for the children of the root
+        heap = []
+        count = 0  # Tie-breaker counter. Otherwise we get an error trying to compare nodes
+        for child in self.dag.graph[self.dag.root]:
+            # Push a tuple of (layer, counter, node) into the heap
+            heapq.heappush(heap, (child.layer, count, child))
+            count += 1
+
+        # Pop nodes in order of increasing layer
+        while heap:
+            _, _, node = heapq.heappop(heap)
+            for child in self.dag.graph[node]:
+                heapq.heappush(heap, (child.layer, count, child))
+                count += 1
+
+            # Execute node
+            node.execute(self.params, self.device)
             out = node
-            # print(f"Node: {node.desc}, Expected Shape: {node.shape}, Actual Shape: {node.tensor.shape}")
 
         if len(out.tensor.shape) > 2:
             print("Output too big")
             return None
 
-        return out.tensor # Output node will always come last since we step layer by layer and prune
+        return out.tensor  # Output is always the last processed node
 
     def loss(self, y_pred, y, loss=torch.nn.functional.cross_entropy):
         '''Calculate loss'''
@@ -90,8 +101,8 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
-                if (i + 1) / len(self.train) >= 0.01:
-                    return None
+                # if (i + 1) / len(self.train) >= 0.01:
+                #     return None
 
                 # Iteratively increase the amount we train
                 if generation:
