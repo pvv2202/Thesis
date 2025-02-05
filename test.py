@@ -95,10 +95,12 @@ if __name__ == "__main__":
     genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
     genome.genome = [
        # 'conv2d', 64, 3
-        1, 'flatten', 2, 'mat_add', 1, 'mat_add', 'conv2d', 8, 'dup', 2, 1, 4, 8, 'matmul_nodes', 4, 1, 'matmul',
-         'conv2d', 'mat_add', 1, 3, 128, 'mat_add', 16, 'conv2d', 'conv2d', 'conv2d', 'mat_add_nodes', 2,
-         'mat_add_nodes', 'conv2d', 16, 'conv2d', 'mat_add_nodes', 64, 'matmul', 2, 128, 'matmul_nodes',
-         'mat_add_nodes', 'dup', 5, 'matmul_nodes', 128, 2, 'mat_add_nodes', 'matmul', 16, 'matmul', 64
+        32, 128, 5, 3, 'dup', 1, 32, 'maxpool2d', 'matmul_nodes', 'dup', 'maxpool2d', 2, 5, 4, 128, 'dup',
+         'matmul_nodes', 'dup', 128, 1, 'dup', 4, 'matmul', 128, 8, 'mat_add_nodes', 2, 128, 2, 4, 'mat_add',
+         'maxpool2d', 'mat_add', 'mat_add', 'flatten', 'maxpool2d', 8, 'matmul', 'conv2d', 128, 'mat_add_nodes', 'dup',
+         1, 'mat_add', 'matmul', 128, 'flatten', 5, 'matmul', 'matmul_nodes', 4, 'conv2d', 'dup', 'conv2d', 128,
+         'flatten', 1, 'conv2d', 'flatten', 'conv2d', 'matmul', 'matmul_nodes', 'matmul_nodes', 'maxpool2d', 'matmul',
+         'matmul', 3, 'matmul_nodes', 'conv2d', 'mat_add_nodes', 'conv2d', 1, 2, 'conv2d', 'dup', 128, 'mat_add_nodes'
         # 'conv2d','conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 512, 512, 512, 512, 256, 256, 256, 256, 128, 128, 128, 128, 64, 64, 64, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
     ]
     network = genome.transcribe()
