@@ -101,8 +101,8 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
-                # if (i + 1) / len(self.train) >= 0.01:
-                #     return None
+                if (i + 1) / len(self.train) >= 0.1:
+                    return None
 
                 # Iteratively increase the amount we train
                 if generation:
@@ -149,6 +149,9 @@ class Network:
 
                 correct_predictions += (predictions == y).sum().item()
                 results[i] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
+
+            if i/len(self.test) >= 0.1:
+                break
 
         # Calculate accuracy
         accuracy = correct_predictions / test_sum

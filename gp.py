@@ -11,7 +11,7 @@ import pickle
 # TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
 SINT_RANGE = (1, 5)
 INT_VALS = [8, 16, 32, 64, 128, 256]
-ADD_RATE = 0.18
+ADD_RATE = 0.09
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 # TODO: Experiment with alpha
 ALPHA = 0.2 # Used for loss function with parameter count. Between 0 and 1. Higher means we weigh parameter count more
@@ -84,6 +84,10 @@ class Genome:
                 continue
             new_genome.append(gene)
 
+        # Redo if no changes were made
+        if self.genome == new_genome:
+            self.UMAD()
+
         # Update genome
         self.genome = new_genome
     # TODO: Move interpreter instance to population
@@ -140,8 +144,7 @@ class Population:
         batch = random.randint(0, len(self.test) - 1)
 
         # Randomly select whether to use loss (0) or accuracy (1)
-        # metric = random.choice([0, 1]) # TODO: Temporarily just using accuracy
-        metric = 1
+        metric = random.choice([0, 1])
 
         # Get the results for the test case
         test_results = [genome.results[batch][metric] for genome in candidates] # Results of the form total loss, percent accuracy
