@@ -76,9 +76,9 @@ class Network:
 
         return loss(y_pred, y)
 
-    def fit(self, epochs=3, learning_rate=0.001, momentum = 0.9, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.SGD, drought=False, generation=None):
+    def fit(self, epochs=3, learning_rate=0.001, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=False, generation=None, downsample=None):
         '''Fit the model'''
-        optimizer = optimizer_class(self.params, lr=learning_rate, momentum=momentum)
+        optimizer = optimizer_class(self.params, lr=learning_rate)
         train_fraction = 1
         if generation:
             train_fraction = epochs*generation # Get fraction of data we want to train with
@@ -101,7 +101,7 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
-                if (i + 1) / len(self.train) >= 0.1:
+                if downsample is not None and (i + 1) / len(self.train) >= downsample:
                     return None
 
                 # Iteratively increase the amount we train
@@ -117,7 +117,7 @@ class Network:
                     if accuracy <= 0.15:
                         return (loss, accuracy, results)
 
-            return None
+        return None
 
     def evaluate(self, loss_fn=torch.nn.functional.cross_entropy):
         '''Evaluate the model on the test set. Returns loss, accuracy tuple'''
@@ -150,8 +150,8 @@ class Network:
                 correct_predictions += (predictions == y).sum().item()
                 results[i] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
 
-            if i/len(self.test) >= 0.1:
-                break
+            # if i/len(self.test) >= 0.25:
+            #     break
 
         # Calculate accuracy
         accuracy = correct_predictions / test_sum

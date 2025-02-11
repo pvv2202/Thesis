@@ -206,7 +206,7 @@ class Population:
         for genome in self.population:
             genome.UMAD()
 
-    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, drought=False, increase_epochs=False):
+    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, drought=False, increase_epochs=False, downsample=False):
         '''Runs the population on the train and test data'''
         acc = []
         size = []

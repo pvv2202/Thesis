@@ -90,49 +90,47 @@ if __name__ == "__main__":
     # print(f"Fitness: {genome.fitness}")
 
     '''Individual Tests'''
-    # interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True)
-    # instructions = Instructions(activation="relu")
-    # genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
-    # genome.genome = [
-    #     4, 'matmul', 'maxpool2d', 16, 'dup', 32, 'matmul_nodes', 4, 'dup', 'maxpool2d', 'mat_add',
-    #                   'mat_add', 'matmul', 'flatten', 'matmul_nodes', 'mat_add_nodes', 64, 2, 8, 'mat_add_nodes', 128,
-    #                   'conv2d', 2, 128, 4, 'conv2d', 'dup', 'dup', 16, 32, 1, 'mat_add', 1, 1, 2, 3, 'dup',
-    #                   'matmul_nodes', 3, 'conv2d', 128, 'flatten', 32, 'mat_add', 'conv2d', 'mat_add_nodes', 128,
-    #                   'mat_add_nodes', 16, 256, 256, 'conv2d', 'dup', 'dup', 32, 'matmul', 'conv2d'
-    #
-    # # 'conv2d','conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 512, 512, 512, 512, 256, 256, 256, 256, 128, 128, 128, 128, 64, 64, 64, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
-    # ]
-    # network = genome.transcribe()
-    # network.visualize()
-    # print(network)
-    # network.fit(epochs=10)
-    # fitness = network.evaluate()
-    # print(f"Genome fitness: {fitness}")
+    interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True)
+    instructions = Instructions(activation="relu")
+    genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
+    genome.genome = [
+        'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'flatten', 'maxpool2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'maxpool2d', 'conv2d',
+        32, 64, 128, 256, 512, 1024, 512, 512, 256, 256, 128, 128, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+
+     #'conv2d','conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d','conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 512, 512, 512, 512, 256, 256, 256, 256, 128, 128, 128, 128, 64, 64, 64, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+    ]
+    network = genome.transcribe()
+    network.visualize()
+    print(network)
+    network.fit(epochs=5)
+    fitness = network.evaluate()
+    print(f"Genome fitness: {fitness}")
 
     '''Population Example'''
-    # pop = Population.load("pop.pkl")
-    pop = gp.Population(
-        size=100, # Population size (number of individuals)
-        num_initial_genes=50, # Number of genes to start with for each individual
-        train=train_loader, # Training data
-        test=test_loader, # Testing data
-        activation="relu", # Activation function to use (of None, no default activation function is used)
-        auto_bias=True, # Whether to automatically add bias to the network
-        separate_ints=True # Whether to separate small integers from large integers in the stacks
-    )
-    # pop.save("pop.pkl")
-    pop.run(
-        generations=100, # Number of generations to run this population for
-        epochs=1, # Number of epochs to train each network for
-        method='epsilon-lexicase', # Selection method
-        pool_size=100, # Number of individuals to select from the population for each selection into the next generation
-        param_limit=50000000, # Maximum number of parameters allowed in a network
-        flops_limit=5000000000, # Maximum number of FLOPs allowed in a network
-        drought=False, # Whether to use a drought mechanism that kills bad networks off early
-        increase_epochs=False # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
-    )
-
-    for genome in pop.population:
-        print(genome.fitness)
-        print(genome.genome)
-        print("")
+    # # pop = Population.load("pop.pkl")
+    # pop = gp.Population(
+    #     size=100, # Population size (number of individuals)
+    #     num_initial_genes=1000, # Number of genes to start with for each individual
+    #     train=train_loader, # Training data
+    #     test=test_loader, # Testing data
+    #     activation="relu", # Activation function to use (of None, no default activation function is used)
+    #     auto_bias=True, # Whether to automatically add bias to the network
+    #     separate_ints=True # Whether to separate small integers from large integers in the stacks
+    # )
+    # # pop.save("pop.pkl")
+    # pop.run(
+    #     generations=100, # Number of generations to run this population for
+    #     epochs=1, # Number of epochs to train each network for
+    #     method='epsilon-lexicase', # Selection method
+    #     pool_size=100, # Number of individuals to select from the population for each selection into the next generation
+    #     param_limit=50000000, # Maximum number of parameters allowed in a network
+    #     flops_limit=5000000000, # Maximum number of FLOPs allowed in a network
+    #     drought=False, # Whether to use a drought mechanism that kills bad networks off early
+    #     increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
+    #     downsample=0.1 # Choose whether to downsample and by how much
+    # )
+    #
+    # for genome in pop.population:
+    #     print(genome.fitness)
+    #     print(genome.genome)
+    #     print("")
