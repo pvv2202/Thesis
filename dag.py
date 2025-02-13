@@ -18,11 +18,6 @@ class Node:
         '''Execute the function on the input, store the result'''
         # Do nothing if no function or parents have no tensor
         if self.fn is None or any(parent.tensor is None for parent in self.parents):
-            print(self.layer)
-            for parent in self.parents:
-                print(parent.layer)
-                print(parent.desc)
-                print(parent.tensor)
             return self.tensor
 
         parent_tensors = [parent.tensor for parent in self.parents]
@@ -45,6 +40,7 @@ class DAG:
 
         # Add root node to graph
         self.root = root
+        self.hidden_node = None
         self.graph[root] = []
 
     def add_edge(self, u, v):

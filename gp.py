@@ -18,12 +18,10 @@ ALPHA = 0.2 # Used for loss function with parameter count. Between 0 and 1. High
 
 class Genome:
     '''Genome of a Push Program'''
-    def __init__(self, train, test, interpreter, instructions):
+    def __init__(self, interpreter, instructions):
         self.genome = []
         self.fitness = 0
         self.metrics = (float('inf'), float('-inf'), float('inf')) # Loss, accuracy, parameter count
-        self.train = train
-        self.test = test
         self.interpreter = interpreter
         self.instructions = instructions
         self.network = None
@@ -90,7 +88,7 @@ class Genome:
 
         # Update genome
         self.genome = new_genome
-    # TODO: Move interpreter instance to population
+
     def transcribe(self):
         '''Transcribes the genome to create a network. Returns the network'''
         self.interpreter.read_genome(self.genome) # Read genome (process it into stacks)
@@ -100,20 +98,22 @@ class Genome:
 
 class Population:
     '''Population of Push Program Genomes'''
-    def __init__(self, size, num_initial_genes, train, test, activation, auto_bias, separate_ints):
+    def __init__(self, size, num_initial_genes, input_shape, output_shape, activation, auto_bias, separate_ints, embedding=False, embed_dim=None, vocab_size=None, recurrent=False):
         self.size = size
-        self.train = train
-        self.test = test
         self.instructions = Instructions(activation=activation)
         # Interpreter needs the data (for auto output) and a number of other toggleable options
         self.interpreter = Interpreter(
-            train=self.train,
-            test=self.test,
+            input_shape=input_shape,
+            output_shape=output_shape,
             activation=activation,
             auto_bias=auto_bias,
-            separate_ints=separate_ints
+            separate_ints=separate_ints,
+            embedding=embedding,
+            embed_dim=embed_dim,
+            vocab_size=vocab_size,
+            recurrent=recurrent
         )
-        self.population = [Genome(train, test, self.interpreter, self.instructions) for _ in range(size)]
+        self.population = [Genome(self.interpreter, self.instructions) for _ in range(size)]
         # Initialize the population with random genes
         for genome in self.population:
             genome.initialize_random(num_initial_genes)
@@ -136,12 +136,12 @@ class Population:
         '''Selects the best genome from a tournament with size individuals'''
         size = min(size, self.size) # Ensure size is not greater than the population size
         tournament = random.sample(self.population, size)
-        return max(tournament, key=lambda x: x.fitness)
+        return max(tournament, key=lambda x: x.fitness[0]) # By accuracy
 
-    def epsilon_lexicase(self, candidates, round, max_rounds):
+    def epsilon_lexicase(self, candidates, round, max_rounds, test):
         '''Selects the best genome using epsilon lexicase selection'''
         # Choose a random test case
-        batch = random.randint(0, len(self.test) - 1)
+        batch = random.randint(0, len(test) - 1)
 
         # Randomly select whether to use loss (0) or accuracy (1)
         metric = random.choice([0, 1])
@@ -164,9 +164,9 @@ class Population:
         # If no genomes pass, fallback to the best genome based on the test case
         if not next:
             if metric == 0:
-                return min(self.population, key=lambda genome: genome.results[batch][metric])
+                return min(self.population, key=lambda genome: genome.results[batch][metric]) # Minimize loss
             if metric == 1:
-                return max(self.population, key=lambda genome: genome.results[batch][metric])
+                return max(self.population, key=lambda genome: genome.results[batch][metric]) # Maximize accuracy
 
         if len(next) == 1:
             return next[0]
@@ -174,7 +174,7 @@ class Population:
             # Randomly select from passing genomes unless we're on the max rounds at which point just return a random one
             return self.epsilon_lexicase(next, round + 1, max_rounds) if round < max_rounds else random.choice(next)
 
-    def forward_generation(self, method='tournament', size=5, max_rounds=5):
+    def forward_generation(self, test, method='tournament', size=5, max_rounds=5):
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Higher fitness is better
         self.population.sort(key=lambda x: x.fitness[1], reverse=True) # Sort by accuracy currently
@@ -194,7 +194,7 @@ class Population:
                 new_population = []
                 for _ in range(self.size):
                     # Select a genome and make a deep copy. We pass results and a random sample of the population
-                    genome = self.epsilon_lexicase(self.population, 1, max_rounds)
+                    genome = self.epsilon_lexicase(self.population, 1, max_rounds, test)
                     new_genome = copy.deepcopy(genome)
                     new_population.append(new_genome)
                 # Update the population
@@ -206,7 +206,7 @@ class Population:
         for genome in self.population:
             genome.UMAD()
 
-    def run(self, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, drought=False, increase_epochs=False, downsample=False):
+    def run(self, train, test, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, drought=False, increase_epochs=False, downsample=False):
         '''Runs the population on the train and test data'''
         acc = []
         size = []
@@ -241,11 +241,11 @@ class Population:
                     generation = None
 
                 # Train the network
-                res = network.fit(epochs=epochs, drought=drought, generation=generation)
+                res = network.fit(train=train, test=test, epochs=epochs, drought=drought, generation=generation, downsample=downsample)
 
                 # Evaluate the network, store results. Parameter count not used currently.
                 if res is None:
-                    loss, accuracy, results = network.evaluate()
+                    loss, accuracy, results = network.evaluate(test=test)
                 else:
                     loss, accuracy, results = res
 
@@ -285,7 +285,7 @@ class Population:
             print(f"Generation {gen_num} Completed")
             print("--------------------------------------------------\n")
 
-            self.forward_generation(method=method, size=pool_size)
+            self.forward_generation(test, method=method, size=pool_size, max_rounds=5)
 
         if best_genome[0] is not None:
             print(f"Best genome: {best_genome[0].genome}")

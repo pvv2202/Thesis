@@ -2,28 +2,25 @@ import torch
 from collections import deque
 from line_profiler import profile
 from tqdm import tqdm
-import math
-import random
 import heapq
 import networkx as nx
 import matplotlib.pyplot as plt
 
 class Network:
-    def __init__(self, dag, train, test, params, device):
+    def __init__(self, dag, params, device, recurrent=False):
         '''Initialize network object'''
         self.dag = dag
-        self.train = train
-        self.test = test
         self.params = params
         self.device = device
         self.param_count = sum(p.numel() for p in self.params) # Number of elements across all parameter arrays
         self.flops = self.calculate_flops()
+        self.recurrent = recurrent
 
     def calculate_flops(self):
         '''Calculate and return flops'''
         flops = 0
 
-        #BFS
+        # BFS
         queue = deque()
         queue.extend(self.dag.graph[self.dag.root])
         while queue:
@@ -34,11 +31,15 @@ class Network:
         return flops
 
     @profile
-    def forward(self, x):
+    def forward(self, x, h=None):
         '''Forward pass through the graph'''
         # Load tensor into the root node
         self.dag.root.tensor = x
         out = self.dag.root
+
+        # Update hidden node if recurrent
+        if self.recurrent:
+            self.dag.hidden_node.tensor = h
 
         # Min heap (by layer) for the children of the root
         heap = []
@@ -59,25 +60,28 @@ class Network:
             node.execute(self.params, self.device)
             out = node
 
-        if len(out.tensor.shape) > 2:
-            print("Output too big")
-            return None
-
         return out.tensor  # Output is always the last processed node
 
-    def loss(self, y_pred, y, loss=torch.nn.functional.cross_entropy):
-        '''Calculate loss'''
-        # print(f"Shape of y_pred: {y_pred.shape}")
-        # print(f"Shape of y: {y.shape}")
+    def loss(self, y_pred, y, loss_fn=torch.nn.functional.cross_entropy):
+        '''Calculate Loss'''
         if y_pred is None:
             print("Invalid network")
             print(self.dag)
             return float('-inf')
 
-        return loss(y_pred, y)
+        # Flatten for cross entropy
+        # (batch_size * seq_len, vocab_size) vs. (batch_size * seq_len)
+        y_pred_flat = y_pred.view(-1, y_pred.size(-1))  # (N, C)
+        y_flat = y.view(-1)  # (N,)
 
-    def fit(self, epochs=3, learning_rate=0.001, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=False, generation=None, downsample=None):
+        return loss_fn(y_pred_flat, y_flat)
+
+    def fit(self, train, test, epochs=3, learning_rate=0.001, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=False, generation=None, downsample=None):
         '''Fit the model'''
+        if train == None:
+            print("No training data provided")
+            return
+
         optimizer = optimizer_class(self.params, lr=learning_rate)
         train_fraction = 1
         if generation:
@@ -85,12 +89,23 @@ class Network:
 
         for epoch in range(epochs):
             # Iterate over the training data, use tqdm to show a progress bar
-            progress_bar = tqdm(self.train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch", colour="green")
+            progress_bar = tqdm(train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch", colour="green")
+
+            # If recurrent, reset hidden node
+            if self.recurrent:
+                x, y = next(iter(train))
+                batch_dim = x.shape[0]
+                prev_y = torch.zeros(batch_dim, *self.dag.hidden_node.shape).to(self.device)
 
             for i, (x, y) in enumerate(progress_bar):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
-                y_pred = self.forward(x)
+
+                if self.recurrent:
+                    y_pred = self.forward(x=x, h=prev_y)
+                    prev_y = y_pred.detach() # Detach to allow for backpropagation
+                else:
+                    y_pred = self.forward(x)
 
                 # Forward pass and compute loss
                 l = self.loss(y_pred, y, loss_fn)
@@ -101,61 +116,78 @@ class Network:
                 # Update parameters
                 optimizer.step()
 
-                if downsample is not None and (i + 1) / len(self.train) >= downsample:
+                if downsample is not None and (i + 1) / len(train) >= downsample:
                     return None
 
                 # Iteratively increase the amount we train
                 if generation:
-                    fraction_done = (i + 1) / len(self.train)
+                    fraction_done = (i + 1) / len(train)
                     if fraction_done >= train_fraction:
                         return None
 
                 # If drought is on and we've trained on 25%, test to see if we stop here
                 # TODO: Hard-coded threshold for now
-                if drought and i == len(self.train) // 4:
-                    loss, accuracy, results = self.evaluate()
+                if drought and i == len(train) // 4:
+                    loss, accuracy, results = self.evaluate(test)
                     if accuracy <= 0.15:
                         return (loss, accuracy, results)
 
         return None
 
-    def evaluate(self, loss_fn=torch.nn.functional.cross_entropy):
+    def evaluate(self, test, loss_fn=torch.nn.functional.cross_entropy):
+        # TODO: Update to handle reccurent networks
         '''Evaluate the model on the test set. Returns loss, accuracy tuple'''
+        if test == None:
+            print("No testing data provided")
+            return
+
         correct_predictions = 0
         total_loss = 0
         test_sum = 0
 
         results = {}
 
-        for i, (x, y) in enumerate(self.test):
+        # If recurrent, reset hidden node
+        if self.recurrent:
+            x, y = next(iter(test))
+            batch_dim = x.shape[0]
+            prev_y = torch.zeros(batch_dim, *self.dag.hidden_node.shape).to(self.device)
+
+        for x, y in test:
             x, y = x.to(self.device), y.to(self.device)
             # Forward pass and compute
             with torch.no_grad():
-                y_pred = self.forward(x)
+                if self.recurrent:
+                    y_pred = self.forward(x=x, h=prev_y)
+                    prev_y = y_pred.detach() # Detach to allow for backpropagation
+                else:
+                    y_pred = self.forward(x)
+
                 # print("Prediction:")
                 # print(torch.max(y_pred, -1))
                 # print("Actual:")
                 # print(y)
+
                 l = self.loss(y_pred, y, loss_fn)
                 # If invalid, just return inf, -inf
                 if type(l) == float:
                     return float('inf'), float('-inf')
                 total_loss += l.item()
 
-                test_sum += len(y) # Should be a batch of labels
+                test_sum += y.numel() # Number of elements in y
 
                 # Calculate accuracy
                 _, predictions = torch.max(y_pred, -1) # Should always be last dimension (hence -1). Max, indices is the form
 
                 correct_predictions += (predictions == y).sum().item()
-                results[i] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
+                results[x] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
 
             # if i/len(self.test) >= 0.25:
             #     break
 
         # Calculate accuracy
         accuracy = correct_predictions / test_sum
-        print(f'Test set: Loss: {total_loss / len(self.test)}, Accuracy: {accuracy * 100:.2f}%')
+        print(f'Test set: Loss: {total_loss / len(test)}, Accuracy: {accuracy * 100:.2f}%')
 
         return total_loss, accuracy, results
 
@@ -190,3 +222,4 @@ class Network:
 
     def __str__(self):
         return self.dag.__str__() + '\n' + f"Parameters: {self.param_count}" + '\n' + f"FLOPs: {self.flops}"
+

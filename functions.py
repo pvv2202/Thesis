@@ -23,6 +23,21 @@ def conv2d(x, kernel, bias, stride=1, padding='same', dilation=1):
 def dup(x):
     return x
 
+def embedding(x, weights):
+    if x.dtype != torch.long:
+        x = x.long()
+
+    original_shape = x.shape
+    x_flat = x.view(-1)
+    embs_flat = weights[x_flat]
+
+    if len(original_shape) == 1:
+        return embs_flat
+    else:
+        batch_size, seq_len = original_shape
+        embed_dim = weights.shape[1]
+        return embs_flat.view(batch_size, seq_len, embed_dim)
+
 # def batch_norm(x, gamma, beta, eps=1e-5, momentum=0.1, training=True):
 #     if training:
 

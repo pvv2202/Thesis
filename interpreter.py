@@ -1,15 +1,11 @@
-import torch
 import utils
 import gp
-from collections import deque
 from instructions import Instructions
 from dag import *
-from utils import *
 from functions import *
 from network import Network
 import torch.nn.init as init
 
-# TODO: Maybe do the same with bias?
 # Functions to be activated if activation is not None (default is relu)
 ACTIVE = ['matmul', 'conv2d']
 # Functions to have manual bias added. Conv2d does it automatically so don't include it here.
@@ -20,7 +16,7 @@ class Interpreter:
     Push Interpreter. By default, automatically adds relu and bias where applicable and
     separates small vs. large integers
     '''
-    def __init__(self, train, test, activation='relu', auto_bias=True, separate_ints=True):
+    def __init__(self, input_shape, output_shape, activation='relu', auto_bias=True, separate_ints=True, embedding=False, embed_dim=None, vocab_size=None, recurrent=False):
         self.stacks = {
             'int': [], # Really just Natural numbers
             'sint': [], # Small integers
@@ -38,24 +34,20 @@ class Interpreter:
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        self.train = train
-        self.test = test
-        # TODO: Improve this. Right now you can specify a consistent activation function (default relu).
+        # Network parameters
+        self.input_shape = input_shape
+        self.output_shape = output_shape
         self.activation = activation
         self.auto_bias = auto_bias
         self.separate_ints = separate_ints
 
-        # Get input/output shapes
-        train_x, train_y = next(iter(train)) # Get example input/output
-        self.input_shape = tuple(train_x.size()[1:])
-        if train_y.ndim == 0: # Single value
-            self.output_shape = (1,)
-        elif train_y.ndim == 1: # Classification
-            num_classes = len(torch.unique(train_y))
-            self.output_shape = (num_classes,)
-            # self.output_shape = (10,)
-        else: # Regression or multi-class/multi-label classification
-            self.output_shape = tuple(train_y.size())
+        # Embedding parameters
+        self.embedding = embedding
+        self.embed_dim = embed_dim
+        self.vocab_size = vocab_size
+
+        # Recurrent parameters
+        self.recurrent = recurrent
 
         # Initialize instructions
         self.instructions = Instructions(activation=self.activation)
@@ -87,6 +79,12 @@ class Interpreter:
         dag = DAG(root)
         self.net['nodes'].append(root)
 
+        if self.embedding:
+            self.add_embedding(dag)
+
+        if self.recurrent:
+            self.add_hidden_state(dag)
+
         # Graph should be created after this
         while len(self.stacks['exec']) > 0:
             # Get next instruction
@@ -117,10 +115,9 @@ class Interpreter:
         # Create network
         network = Network(
             dag=dag,
-            train=self.train,
-            test=self.test,
             params=self.net['params'],
-            device=self.device
+            device=self.device,
+            recurrent=self.recurrent
         )
         return network
 
@@ -138,6 +135,47 @@ class Interpreter:
             'nodes': deque([]),
             'params': []
         }
+
+    def add_hidden_state(self, dag):
+        last_node = self.net['nodes'][0]  # Don't pop so we can use it with this node or others
+
+        # Add recurrent layer
+        hidden_node = Node(
+            shape=(self.output_shape),
+            layer=last_node.layer,
+            fn=None,
+            parents=[self.net['nodes'][0]],
+            desc="Hidden State",
+            flops=0,
+            weight_id=None
+        )
+
+        dag.hidden_node = hidden_node  # Add hidden node to graph
+
+        dag.add_edge(last_node, hidden_node)
+        self.net['nodes'].append(hidden_node)
+
+    def add_embedding(self, dag):
+        '''Adds an embedding layer to the input'''
+        last_node = self.net['nodes'].popleft()
+        last_shape = last_node.shape
+
+        weights = torch.empty(self.vocab_size, self.embed_dim, requires_grad=True, device=self.device)
+        init.xavier_uniform_(weights)
+        self.net['params'].append(weights)
+
+        node = Node(
+            shape=(last_shape[0], self.embed_dim),
+            layer=1, # Since this will only ever come after the root
+            fn=embedding,
+            parents=[last_node],
+            desc="Embedding",
+            flops=self.input_shape[0] * self.embed_dim,  # Approximate cost
+            weight_id=len(self.net['params'])-1
+        )
+
+        dag.add_edge(last_node, node)
+        self.net['nodes'].append(node)
 
     def add_output(self, dag):
         '''Adds the output layer to the DAG, There should always be at least 1 node in the stack'''

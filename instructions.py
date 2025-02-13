@@ -9,7 +9,7 @@ import torch.nn.init as init
 
 # TODO: Add a bool stack for things like bias in conv
 
-ACTIVATIONS = ['relu', 'sigmoid', 'softmax']
+ACTIVATIONS = ['relu', 'sigmoid', 'softmax', 'tanh']
 
 class Instructions:
     '''Instructions for the Push Interpreter. Returns True if instruction was successful (added to dag), False otherwise'''
@@ -180,45 +180,45 @@ class Instructions:
 
     # TODO: Add a weird convolution that doesn't use conv2d but uses matmul?
 
-    @staticmethod
-    def flatten(dag, net):
-        '''Flatten'''
-        # Do nothing if there aren't enough nodes in the stack
-        if len(net['nodes']) < 1:
-            return False
-
-        # Ensure top node has more than 1 dimension
-        if len(net['nodes'][0].shape) < 2:
-            return False
-
-        # Pop the top node from the stack
-        pop_node = net['nodes'].popleft()
-        last_shape = pop_node.shape
-
-        prod = 1
-        for x in last_shape:
-            prod *= x
-
-        # Define partial function
-        flatten_partial = partial(flatten, start_dim=1)
-
-        # Create new node
-        node = Node(
-            shape=(prod,),
-            layer=pop_node.layer + 1,
-            fn=flatten_partial,
-            parents=[pop_node],
-            desc="Flatten",
-            flops=0
-        )
-
-        # Add the new node to the graph
-        dag.add_edge(u=pop_node, v=node)
-
-        # Add new node to stack
-        net['nodes'].append(node)
-
-        return True
+    # @staticmethod
+    # def flatten(dag, net):
+    #     '''Flatten'''
+    #     # Do nothing if there aren't enough nodes in the stack
+    #     if len(net['nodes']) < 1:
+    #         return False
+    #
+    #     # Ensure top node has more than 1 dimension
+    #     if len(net['nodes'][0].shape) < 2:
+    #         return False
+    #
+    #     # Pop the top node from the stack
+    #     pop_node = net['nodes'].popleft()
+    #     last_shape = pop_node.shape
+    #
+    #     prod = 1
+    #     for x in last_shape:
+    #         prod *= x
+    #
+    #     # Define partial function
+    #     flatten_partial = partial(flatten, start_dim=1)
+    #
+    #     # Create new node
+    #     node = Node(
+    #         shape=(prod,),
+    #         layer=pop_node.layer + 1,
+    #         fn=flatten_partial,
+    #         parents=[pop_node],
+    #         desc="Flatten",
+    #         flops=0
+    #     )
+    #
+    #     # Add the new node to the graph
+    #     dag.add_edge(u=pop_node, v=node)
+    #
+    #     # Add new node to stack
+    #     net['nodes'].append(node)
+    #
+    #     return True
 
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod
@@ -440,6 +440,11 @@ class Instructions:
     def sigmoid(dag, net):
         '''Sigmoid Activation Function'''
         Instructions.process_torch_ops(dag, net, torch.sigmoid, "Sigmoid")
+
+    @staticmethod
+    def tanh(dag, net):
+        '''Tanh Activation Function'''
+        Instructions.process_torch_ops(dag, net, torch.tanh, "Tanh")
 
     # @staticmethod
     # def softmax(dag, net):
