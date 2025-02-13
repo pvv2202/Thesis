@@ -132,47 +132,97 @@ class Population:
         print(f"Population loaded from {filename}")
         return population
 
-    def tournament(self, size):
+    def tournament(self, size, minimize=False):
         '''Selects the best genome from a tournament with size individuals'''
         size = min(size, self.size) # Ensure size is not greater than the population size
         tournament = random.sample(self.population, size)
-        return max(tournament, key=lambda x: x.fitness[0]) # By accuracy
 
-    def epsilon_lexicase(self, candidates, round, max_rounds, test):
-        '''Selects the best genome using epsilon lexicase selection'''
-        # Choose a random test case
-        batch = random.randint(0, len(test) - 1)
-
-        # Randomly select whether to use loss (0) or accuracy (1)
-        metric = random.choice([0, 1])
-
-        # Get the results for the test case
-        test_results = [genome.results[batch][metric] for genome in candidates] # Results of the form total loss, percent accuracy
-
-        # Calculate the median and median absolute deviation (MAD)
-        median = np.median(test_results)
-        mad = median_absolute_deviation(test_results)
-
-        # Define epsilon as a range around the median
-        epsilon = 2 * mad
-        lower_bound = median - epsilon
-        upper_bound = median + epsilon
-
-        # Get the fitness of each genome on the test case
-        next = [genome for genome in candidates if lower_bound <= genome.results[batch][metric] <= upper_bound]
-
-        # If no genomes pass, fallback to the best genome based on the test case
-        if not next:
-            if metric == 0:
-                return min(self.population, key=lambda genome: genome.results[batch][metric]) # Minimize loss
-            if metric == 1:
-                return max(self.population, key=lambda genome: genome.results[batch][metric]) # Maximize accuracy
-
-        if len(next) == 1:
-            return next[0]
+        if minimize:
+            return min(tournament, key=lambda x: x.fitness[0])
         else:
-            # Randomly select from passing genomes unless we're on the max rounds at which point just return a random one
-            return self.epsilon_lexicase(next, round + 1, max_rounds) if round < max_rounds else random.choice(next)
+            return max(tournament, key=lambda x: x.fitness[0]) # By accuracy
+
+    def epsilon_lexicase(self, candidates, test, metric_index=0, minimize=False):
+        '''Selects the best genome using epsilon-lexicase selection'''
+        test_order = [i for i in range(len(test))] # Indices. Test batches aren't shuffled so indices work
+        random.shuffle(test_order)
+
+        for t in test_order:
+            metric = [genome.results[t][metric_index] for genome in candidates]
+
+            if minimize:
+                best = min(metric)
+            else:
+                best = max(metric)
+
+            mad = median_absolute_deviation(metric)
+            eps = 2 * mad # 2 * mad for now. Something to test
+
+            if minimize:
+                threshold = best + eps
+            else:
+                threshold = best - eps
+
+            survivors = []
+            for g, m in zip(candidates, metric):
+                if minimize:
+                    if m <= threshold:
+                        survivors.append(g)
+                else:
+                    if m >= threshold:
+                        survivors.append(g)
+
+            candidates = survivors
+
+            if len(candidates) == 1:
+                return candidates[0]
+
+            if not candidates:
+                return min(candidates, key=lambda g: g.results[t][metric_index])
+
+        # End cases
+        if len(candidates) > 1:
+            return random.choice(candidates) # Randomly select from passing genomes
+        elif len(candidates) == 1:
+            return candidates[0] # Select the best
+        else:
+            return random.choice(candidates) # Randomly select from the population if nothing passed (shouldn't happen)
+
+    # def epsilon_lexicase(self, candidates, round, max_rounds, test):
+    #     '''Selects the best genome using epsilon lexicase selection'''
+    #     # Choose a random test case
+    #     batch = random.randint(0, len(test) - 1)
+    #
+    #     # Randomly select whether to use loss (0) or accuracy (1)
+    #     metric = random.choice([0, 1])
+    #
+    #     # Get the results for the test case
+    #     test_results = [genome.results[batch][metric] for genome in candidates] # Results of the form total loss, percent accuracy
+    #
+    #     # Calculate the median and median absolute deviation (MAD)
+    #     median = np.median(test_results)
+    #     mad = median_absolute_deviation(test_results)
+    #
+    #     # Define epsilon as a range around the median
+    #     epsilon = 2 * mad
+    #     lower_bound = median - epsilon
+    #     upper_bound = median + epsilon
+    #
+    #     # Get the fitness of each genome on the test case
+    #     next = [genome for genome in candidates if lower_bound <= genome.results[batch][metric] <= upper_bound]
+    #
+    #     # If no genomes pass, fallback to the best genome based on the test case
+    #     if not next:
+    #         if metric == 0:
+    #             return min(self.population, key=lambda genome: genome.results[batch][metric]) # Minimize loss
+    #         if metric == 1:
+    #             return max(self.population, key=lambda genome: genome.results[batch][metric]) # Maximize accuracy
+    #
+    #     if len(next) == 1:
+    #         return next[0]
+    #     else:
+    #         # Randomly select from passing genomes unless we're on the max rounds at which point just return a random one
+    #         return self.epsilon_lexicase(next, round + 1, max_rounds) if round < max_rounds else random.choice(next)
 
     def forward_generation(self, test, method='tournament', size=5, max_rounds=5):
         '''Moves the population forward one generation'''
@@ -194,7 +244,8 @@ class Population:
                 new_population = []
                 for _ in range(self.size):
                     # Select a genome and make a deep copy. We pass results and a random sample of the population
-                    genome = self.epsilon_lexicase(self.population, 1, max_rounds, test)
+                    #  genome.metrics = (loss, accuracy, network.flops, network.param_count)
+                    genome = self.epsilon_lexicase(self.population, test, metric_index=1, minimize=False)
                     new_genome = copy.deepcopy(genome)
                     new_population.append(new_genome)
                 # Update the population

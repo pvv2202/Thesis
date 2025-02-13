@@ -185,7 +185,7 @@ def maxpool2d_shape(matrix_shape, kernel_size, stride=2):
     return (c, h_out, w_out)
 
 def median_absolute_deviation(data):
-    """Calculate the Median Absolute Deviation (MAD)."""
+    """Calculate the Median Absolute Deviation (MAD)"""
     median = np.median(data)
     deviations = np.abs(data - median)
     return np.median(deviations)

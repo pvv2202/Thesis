@@ -394,6 +394,16 @@ class Instructions:
         return True
 
     #########################
+    ######## RNN Ops ########
+    #########################
+
+    # @staticmethod
+    # def recurrence(dag, net, fn, desc, separate_ints):
+    #     '''Connect back to a node in a layer specified by sint/int stack'''
+    #     # Do nothing if there aren't enough ints in the stack
+    #     if separate_ints:
+
+    #########################
     ###### PyTorch Ops ######
     #########################
 
