@@ -31,24 +31,24 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     '''Individual Tests'''
-    # interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True)
-    # instructions = Instructions(activation="relu")
-    # genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
+    # interpreter = gp.Interpreter(input_shape=(3,32,32), output_shape=(10,), activation="relu", auto_bias=True)
+    # instructions = gp.Instructions(activation="relu")
+    # genome = gp.Genome(interpreter=interpreter, instructions=instructions)
     # genome.genome = [
-    #     3, 3, 'mat_add', 8, 'matmul', 2, 128, 'conv2d', 'dup', 'maxpool2d', 16, 'maxpool2d', 'conv2d', 4, 2, 16, 256, 'mat_add', 64
+    #     3, 3, 'mat_add', 8, 'matmul', 2, 128, 'conv2d', 'dup', 'avgpool2d', 'maxpool2d', 16, 'maxpool2d', 'conv2d', 4, 2, 16, 256, 'mat_add', 64
     #     # 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'flatten', 'maxpool2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'maxpool2d', 'conv2d',
     #     # 32, 64, 128, 256, 512, 1024, 512, 512, 256, 256, 128, 128, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
     # ]
     # network = genome.transcribe()
     # print(network)
-    # network.fit(epochs=15)
-    # fitness = network.evaluate()
-    # print(f"Genome fitness: {fitness}")
+    # network.fit(epochs=10, train=train_loader, test=val_loader)
+    # network.visualize()
+    # fitness = network.evaluate(test=test_loader)
 
     '''Population Example'''
     # pop = Population.load("pop.pkl")
     pop = gp.Population(
-        size=100, # Population size (number of individuals)
+        size=50, # Population size (number of individuals)
         num_initial_genes=20, # Number of genes to start with for each individual
         input_shape=(3, 32, 32), # Training data
         output_shape=(10,), # Testing data
@@ -63,15 +63,15 @@ if __name__ == "__main__":
     pop.run(
         train=train_loader, # Training data
         test=val_loader, # Validation data
-        generations=100, # Number of generations to run this population for
+        generations=30, # Number of generations to run this population for
         epochs=1, # Number of epochs to train each network for
-        method='epsilon-lexicase', # Selection method
-        pool_size=100, # Number of individuals to select from the population for each selection into the next generation
+        method='tournament', # Selection method
+        pool_size=15, # Number of individuals to select from the population for each selection into the next generation
         param_limit=50000000, # Maximum number of parameters allowed in a network
         flops_limit=5000000000, # Maximum number of FLOPs allowed in a network
         drought=False, # Whether to use a drought mechanism that kills bad networks off early
         increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
-        downsample=0.1 # Choose whether to downsample and by how much
+        downsample=0.5 # Choose whether to downsample and by how much
     )
 
     for genome in pop.population:

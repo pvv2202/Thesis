@@ -162,9 +162,9 @@ def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding='valid', dilation
     # Return the output shape (batch/channel are the same)
     return (c_ko, h_out, w_out)
 
-def maxpool2d_shape(matrix_shape, kernel_size, stride=2):
+def pool2d_shape(matrix_shape, kernel_size, stride=2):
     '''
-    Returns the shape of the resulting tensor from a 2D max pooling operation
+    Returns the shape of the resulting tensor from a 2D pooling operation
     '''
     # If the input is under 3D (channel, h, w), or the kernel is not 3D (channel, h, w), we no-op
     if len(matrix_shape) < 3:

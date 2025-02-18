@@ -158,7 +158,7 @@ class Instructions:
         # Define partial function
         max_pool_partial = partial(max_pool, kernel_size=(2,2), stride=None, padding=0)
 
-        new_shape = utils.maxpool2d_shape(pop_node.shape, (2, 2), stride=2)
+        new_shape = utils.pool2d_shape(pop_node.shape, (2, 2), stride=2)
 
         # Create new node
         node = Node(
@@ -178,47 +178,89 @@ class Instructions:
 
         return True
 
+    @staticmethod
+    def avgpool2d(dag, net):
+        '''2D Average Pooling'''
+        # Do nothing if there aren't enough nodes in the stack
+        if len(net['nodes']) < 1:
+            return False
+
+        # Check if the top node's shape has 4 dimensions (batch, channel, height, width)
+        if len(net['nodes'][0].shape) < 3:
+            return False
+
+        # Check if max pooling is possible.
+        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2), stride=2):
+            return False
+
+        # Pop the top node from the stack
+        pop_node = net['nodes'].popleft()
+
+        # Define partial function
+        avg_pool_partial = partial(avg_pool, kernel_size=(2,2), stride=None, padding=0)
+
+        new_shape = utils.pool2d_shape(pop_node.shape, (2, 2), stride=2)
+
+        # Create new node
+        node = Node(
+            shape=new_shape,
+            layer=pop_node.layer + 1,
+            fn=avg_pool_partial, # For now, hardcode kernel size and stride
+            parents=[pop_node],
+            desc="Avgpool2d",
+            flops=math.prod(new_shape) * (2 * 2 - 1)  # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output elements * comparisons/element
+        )
+
+        # Add the new node to the graph
+        dag.add_edge(u=pop_node, v=node)
+
+        # Add new node to stack
+        net['nodes'].append(node)
+
+        return True
+
+
     # TODO: Add a weird convolution that doesn't use conv2d but uses matmul?
 
-    # @staticmethod
-    # def flatten(dag, net):
-    #     '''Flatten'''
-    #     # Do nothing if there aren't enough nodes in the stack
-    #     if len(net['nodes']) < 1:
-    #         return False
-    #
-    #     # Ensure top node has more than 1 dimension
-    #     if len(net['nodes'][0].shape) < 2:
-    #         return False
-    #
-    #     # Pop the top node from the stack
-    #     pop_node = net['nodes'].popleft()
-    #     last_shape = pop_node.shape
-    #
-    #     prod = 1
-    #     for x in last_shape:
-    #         prod *= x
-    #
-    #     # Define partial function
-    #     flatten_partial = partial(flatten, start_dim=1)
-    #
-    #     # Create new node
-    #     node = Node(
-    #         shape=(prod,),
-    #         layer=pop_node.layer + 1,
-    #         fn=flatten_partial,
-    #         parents=[pop_node],
-    #         desc="Flatten",
-    #         flops=0
-    #     )
-    #
-    #     # Add the new node to the graph
-    #     dag.add_edge(u=pop_node, v=node)
-    #
-    #     # Add new node to stack
-    #     net['nodes'].append(node)
-    #
-    #     return True
+    @staticmethod
+    def flatten(dag, net):
+        '''Flatten'''
+        # Do nothing if there aren't enough nodes in the stack
+        if len(net['nodes']) < 1:
+            return False
+
+        # Ensure top node has more than 1 dimension
+        if len(net['nodes'][0].shape) < 2:
+            return False
+
+        # Pop the top node from the stack
+        pop_node = net['nodes'].popleft()
+        last_shape = pop_node.shape
+
+        prod = 1
+        for x in last_shape:
+            prod *= x
+
+        # Define partial function
+        flatten_partial = partial(flatten, start_dim=1)
+
+        # Create new node
+        node = Node(
+            shape=(prod,),
+            layer=pop_node.layer + 1,
+            fn=flatten_partial,
+            parents=[pop_node],
+            desc="Flatten",
+            flops=0
+        )
+
+        # Add the new node to the graph
+        dag.add_edge(u=pop_node, v=node)
+
+        # Add new node to stack
+        net['nodes'].append(node)
+
+        return True
 
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod

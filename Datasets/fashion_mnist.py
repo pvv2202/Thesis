@@ -48,7 +48,7 @@ if __name__ == "__main__":
     '''Population Example'''
     # pop = Population.load("pop.pkl")
     pop = gp.Population(
-        size=100, # Population size (number of individuals)
+        size=50, # Population size (number of individuals)
         num_initial_genes=20, # Number of genes to start with for each individual
         input_shape=(1, 28, 28), # Input shape
         output_shape=(10,), # Output shape
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     pop.run(
         train=train_loader, # Training data
         test=val_loader, # Validation data
-        generations=100, # Number of generations to run this population for
+        generations=50, # Number of generations to run this population for
         epochs=1, # Number of epochs to train each network for
         method='epsilon-lexicase', # Selection method
         pool_size=100, # Number of individuals to select from the population for each selection into the next generation

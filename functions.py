@@ -14,6 +14,9 @@ def mat_add(x, y):
 def max_pool(x, kernel_size=(2,2), stride=None, padding=0):
     return F.max_pool2d(x, kernel_size, stride, padding)
 
+def avg_pool(x, kernel_size=(2,2), stride=None, padding=0):
+    return F.avg_pool2d(x, kernel_size, stride, padding)
+
 def flatten(x, start_dim=1):
     return torch.flatten(x, start_dim=start_dim)
 
