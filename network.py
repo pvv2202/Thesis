@@ -3,8 +3,8 @@ from collections import deque
 from line_profiler import profile
 from tqdm import tqdm
 import heapq
-import networkx as nx
-import matplotlib.pyplot as plt
+import math
+import pygame
 
 class Network:
     def __init__(self, dag, params, device, recurrent=False):
@@ -135,8 +135,7 @@ class Network:
         return None
 
     def evaluate(self, test, loss_fn=torch.nn.functional.cross_entropy):
-        # TODO: Update to handle reccurent networks
-        '''Evaluate the model on the test set. Returns loss, accuracy tuple'''
+        '''Evaluate the model on the test set. Returns loss, accuracy, results tuple'''
         if test == None:
             print("No testing data provided")
             return
@@ -191,34 +190,137 @@ class Network:
 
         return total_loss, accuracy, results
 
+    def get_height_width(self):
+        '''Conducts a single forward pass of the graph and outputs a tuple (height, width)'''
+        height, width = 0, 0
+
+        # Min heap (by layer) for the children of the root
+        heap = []
+        count = 0  # Tie-breaker counter. Otherwise we get an error trying to compare nodes
+        for child in self.dag.graph[self.dag.root]:
+            # Push a tuple of (layer, counter, node) into the heap
+            heapq.heappush(heap, (child.layer, count, child))
+            count += 1
+
+        # Pop nodes in order of increasing layer
+        curr_layer_count = 0 # Number of nodes on this layer
+        prev_layer = 0
+        while heap:
+            _, _, node = heapq.heappop(heap)
+
+            if node.layer == prev_layer:
+                curr_layer_count += 1
+            else:
+                curr_layer_count = 1
+                prev_layer = node.layer
+                height = node.layer
+
+            width = max(width, curr_layer_count)
+
+            for child in self.dag.graph[node]:
+                heapq.heappush(heap, (child.layer, count, child))
+                count += 1
+
+        return height, width
+
     def visualize(self):
-        # Create the graph
-        G = nx.DiGraph()  # Use DiGraph for directed edges
-        for node in self.dag.graph.keys():
-            G.add_node((node.desc, node.shape), layer=node.layer)
+        '''Visualize the network. Creates a pygame window'''
+        # Initialize pygame
+        pygame.init()
 
-        directed_edges = []
-        parents = []
-        for node, edges in self.dag.graph.items():
-            for edge in edges:
-                directed_edges.append(((node.desc, node.shape), (edge.desc, edge.shape)))
-            if node.parents is not None:
-                for parent in node.parents:
-                    parents.append(((node.desc, node.shape), (parent.desc, parent.shape)))
+        # Constants
+        NODE_RADIUS = 10
+        BACKGROUND_COLOR = (30, 30, 30)
+        NODE_COLOR = (100, 200, 255)
+        EDGE_COLOR = (255, 255, 255)
+        TEXT_COLOR = (255, 255, 255)
+        ARROW_SIZE = 10
+        HEIGHT, WIDTH = self.get_height_width()
+        HEIGHT *= 100
+        WIDTH *= 100
 
-        # Add edges to the graph
-        G.add_edges_from(directed_edges)
-        G.add_edges_from(parents)
+        # Create the display
+        screen = pygame.display.set_mode((HEIGHT, WIDTH))
+        pygame.display.set_caption("Network Visualization")
 
-        pos = nx.multipartite_layout(G, subset_key="layer")
+        # Assign positions to nodes
+        node_positions = {self.dag.root: (50, HEIGHT/2)}
+        # Min heap (by layer) for the children of the root
+        heap = []
+        count = 0  # Tie-breaker counter. Otherwise we get an error trying to compare nodes
+        for child in self.dag.graph[self.dag.root]:
+            # Push a tuple of (layer, counter, node) into the heap
+            heapq.heappush(heap, (child.layer, count, child))
+            count += 1
 
-        plt.figure(figsize=(len(self.dag.graph.keys()), len(self.dag.graph.keys())))
-        nx.draw(G, pos, with_labels=True, node_color="lightblue", node_size=5000, edge_color="black", font_size=10)
-        nx.draw_networkx_edges(G, pos, edgelist=directed_edges, edge_color="black", width=3, style="solid")
-        nx.draw_networkx_edges(G, pos, edgelist=parents, edge_color="red", width=1, style="dashed")
+        # Pop nodes in order of increasing layer
+        curr_layer = [] # Store nodes on current layer
+        prev_layer = 0
+        while heap:
+            _, _, node = heapq.heappop(heap)
 
-        plt.title("Layered Computation Graph")
-        plt.show()
+            if node.layer == prev_layer:
+                curr_layer.append(node)
+            else:
+                for i, x in enumerate(curr_layer):
+                    node_positions[x] = (50 + prev_layer * 50, WIDTH / len(curr_layer) * i * 50)
+                curr_layer = [node]
+                prev_layer = node.layer
+            curr_layer.append(node)
+
+            for child in self.dag.graph[node]:
+                heapq.heappush(heap, (child.layer, count, child))
+                count += 1
+
+        for i, x in enumerate(curr_layer):
+            node_positions[x] = (50 + prev_layer * 50, WIDTH / len(curr_layer) * i * 50)
+
+        def draw_arrow(start, end, color, arrow_size=ARROW_SIZE):
+            """Draws a directed edge with an arrow."""
+            pygame.draw.line(screen, color, start, end, 2)
+
+            # Compute arrowhead
+            angle = math.atan2(end[1] - start[1], end[0] - start[0])
+            x1 = end[0] - arrow_size * math.cos(angle - math.pi / 6)
+            y1 = end[1] - arrow_size * math.sin(angle - math.pi / 6)
+            x2 = end[0] - arrow_size * math.cos(angle + math.pi / 6)
+            y2 = end[1] - arrow_size * math.sin(angle + math.pi / 6)
+
+            pygame.draw.polygon(screen, color, [(end[0], end[1]), (x1, y1), (x2, y2)])
+
+        def draw_graph():
+            """Draws the directed graph with nodes and edges."""
+            # Draw edges (arrows)
+            for node, neighbors in self.dag.graph.items():
+                start_pos = node_positions[node]
+                for neighbor in neighbors:
+                    if neighbor in node_positions:
+                        end_pos = node_positions[neighbor]
+                        draw_arrow(start_pos, end_pos, EDGE_COLOR)
+
+            # Draw nodes
+            for node, pos in node_positions.items():
+                pygame.draw.circle(screen, NODE_COLOR, pos, NODE_RADIUS)
+
+                # Draw node labels
+                font = pygame.font.Font(None, 12)
+                text_surface = font.render(f"{node.desc}: {node.shape}", True, TEXT_COLOR)
+                text_rect = text_surface.get_rect(center=pos)
+                screen.blit(text_surface, text_rect)
+
+        # Main loop
+        running = True
+        while running:
+            screen.fill(BACKGROUND_COLOR)
+            draw_graph()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+
+            pygame.display.flip()
+
+        pygame.quit()
 
     def __str__(self):
         return self.dag.__str__() + '\n' + f"Parameters: {self.param_count}" + '\n' + f"FLOPs: {self.flops}"

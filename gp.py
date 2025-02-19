@@ -98,7 +98,7 @@ class Genome:
 
 class Population:
     '''Population of Push Program Genomes'''
-    def __init__(self, size, num_initial_genes, input_shape, output_shape, activation, auto_bias, separate_ints, embedding=False, embed_dim=None, vocab_size=None, recurrent=False):
+    def __init__(self, size, num_initial_genes, input_shape, output_shape, activation, auto_bias, separate_ints, embedding=False, embed_dim=None, vocab_size=None, recurrent=False, out_file=None):
         self.size = size
         self.instructions = Instructions(activation=activation)
         # Interpreter needs the data (for auto output) and a number of other toggleable options
@@ -114,6 +114,7 @@ class Population:
             recurrent=recurrent
         )
         self.population = [Genome(self.interpreter, self.instructions) for _ in range(size)]
+        self.out_file = out_file
         # Initialize the population with random genes
         for genome in self.population:
             genome.initialize_random(num_initial_genes)
@@ -383,5 +384,6 @@ class Population:
         plt.show()
 
         # Save accuracy data to csv file for excel plotting
-        acc_csv = np.array(acc)
-        np.savetxt("accuracy.csv", acc_csv, delimiter=",")
+        if self.out_file is not None:
+            acc_csv = np.array(acc)
+            np.savetxt(self.out_file, acc_csv, delimiter=",")
