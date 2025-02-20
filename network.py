@@ -225,7 +225,6 @@ class Network:
 
     def visualize(self):
         '''Visualize the network with camera movement using arrow keys or WASD.'''
-        # Initialize pygame
         pygame.init()
 
         # Constants
@@ -238,19 +237,18 @@ class Network:
         WIDTH = 1200
         HEIGHT = 800
 
-        # Create the display
+        # Display
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Network Visualization")
 
-        # Camera offset for movement
+        # Movement variables
         camera_x = 0
         camera_y = 0
-        move_speed = 10  # Speed of movement
+        move_speed = 10
 
-        # Assign positions to nodes
         node_positions = {self.dag.root: (50, HEIGHT // 2)}
         heap = []
-        count = 0  # Tie-breaker counter
+        count = 0
         for child in self.dag.graph[self.dag.root]:
             heapq.heappush(heap, (child.layer, count, child))
             count += 1
