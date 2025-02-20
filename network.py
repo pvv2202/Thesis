@@ -224,89 +224,82 @@ class Network:
         return height, width
 
     def visualize(self):
-        '''Visualize the network. Creates a pygame window'''
+        '''Visualize the network with camera movement using arrow keys or WASD.'''
         # Initialize pygame
         pygame.init()
 
         # Constants
-        NODE_RADIUS = 10
-        BACKGROUND_COLOR = (30, 30, 30)
-        NODE_COLOR = (100, 200, 255)
-        EDGE_COLOR = (255, 255, 255)
-        TEXT_COLOR = (255, 255, 255)
+        NODE_RADIUS = 40
+        BACKGROUND_COLOR = (255, 255, 255)
+        NODE_COLOR = (189, 140, 245)
+        EDGE_COLOR = (0, 0, 0)
+        TEXT_COLOR = (0, 0, 0)
         ARROW_SIZE = 10
-        HEIGHT, WIDTH = self.get_height_width()
-        HEIGHT *= 100
-        WIDTH *= 100
+        WIDTH = 1200
+        HEIGHT = 800
 
         # Create the display
-        screen = pygame.display.set_mode((HEIGHT, WIDTH))
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Network Visualization")
 
+        # Camera offset for movement
+        camera_x = 0
+        camera_y = 0
+        move_speed = 10  # Speed of movement
+
         # Assign positions to nodes
-        node_positions = {self.dag.root: (50, HEIGHT/2)}
-        # Min heap (by layer) for the children of the root
+        node_positions = {self.dag.root: (50, HEIGHT // 2)}
         heap = []
-        count = 0  # Tie-breaker counter. Otherwise we get an error trying to compare nodes
+        count = 0  # Tie-breaker counter
         for child in self.dag.graph[self.dag.root]:
-            # Push a tuple of (layer, counter, node) into the heap
             heapq.heappush(heap, (child.layer, count, child))
             count += 1
 
-        # Pop nodes in order of increasing layer
-        curr_layer = [] # Store nodes on current layer
+        curr_layer = []
         prev_layer = 0
         while heap:
             _, _, node = heapq.heappop(heap)
-
             if node.layer == prev_layer:
                 curr_layer.append(node)
             else:
                 for i, x in enumerate(curr_layer):
-                    node_positions[x] = (50 + prev_layer * 50, WIDTH / len(curr_layer) * i * 50)
+                    node_positions[x] = (50 + prev_layer * 100, 50 + i * 50)
                 curr_layer = [node]
                 prev_layer = node.layer
             curr_layer.append(node)
-
             for child in self.dag.graph[node]:
                 heapq.heappush(heap, (child.layer, count, child))
                 count += 1
-
         for i, x in enumerate(curr_layer):
-            node_positions[x] = (50 + prev_layer * 50, WIDTH / len(curr_layer) * i * 50)
+            node_positions[x] = (50 + prev_layer * 100, 50 + i * 50)
 
         def draw_arrow(start, end, color, arrow_size=ARROW_SIZE):
-            """Draws a directed edge with an arrow."""
             pygame.draw.line(screen, color, start, end, 2)
-
-            # Compute arrowhead
             angle = math.atan2(end[1] - start[1], end[0] - start[0])
             x1 = end[0] - arrow_size * math.cos(angle - math.pi / 6)
             y1 = end[1] - arrow_size * math.sin(angle - math.pi / 6)
             x2 = end[0] - arrow_size * math.cos(angle + math.pi / 6)
             y2 = end[1] - arrow_size * math.sin(angle + math.pi / 6)
-
             pygame.draw.polygon(screen, color, [(end[0], end[1]), (x1, y1), (x2, y2)])
 
         def draw_graph():
-            """Draws the directed graph with nodes and edges."""
-            # Draw edges (arrows)
+            screen.fill(BACKGROUND_COLOR)
             for node, neighbors in self.dag.graph.items():
-                start_pos = node_positions[node]
+                start_pos = (node_positions[node][0] + camera_x, node_positions[node][1] + camera_y)
                 for neighbor in neighbors:
                     if neighbor in node_positions:
-                        end_pos = node_positions[neighbor]
+                        end_pos = (node_positions[neighbor][0] + camera_x, node_positions[neighbor][1] + camera_y)
                         draw_arrow(start_pos, end_pos, EDGE_COLOR)
-
-            # Draw nodes
             for node, pos in node_positions.items():
-                pygame.draw.circle(screen, NODE_COLOR, pos, NODE_RADIUS)
-
-                # Draw node labels
-                font = pygame.font.Font(None, 12)
-                text_surface = font.render(f"{node.desc}: {node.shape}", True, TEXT_COLOR)
-                text_rect = text_surface.get_rect(center=pos)
-                screen.blit(text_surface, text_rect)
+                adjusted_pos = (pos[0] + camera_x, pos[1] + camera_y)
+                pygame.draw.circle(screen, NODE_COLOR, adjusted_pos, NODE_RADIUS)
+                font = pygame.font.Font(None, 20)
+                text_surface_desc = font.render(f"{node.desc}", True, TEXT_COLOR)
+                text_surface_shape = font.render(f"{node.shape}", True, TEXT_COLOR)
+                text_rect_desc = text_surface_desc.get_rect(center=(adjusted_pos[0], adjusted_pos[1] - 10))
+                text_rect_shape = text_surface_shape.get_rect(center=(adjusted_pos[0], adjusted_pos[1] + 10))
+                screen.blit(text_surface_desc, text_rect_desc)
+                screen.blit(text_surface_shape, text_rect_shape)
 
         # Main loop
         running = True
@@ -317,6 +310,16 @@ class Network:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+                camera_x += move_speed
+            if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+                camera_x -= move_speed
+            if keys[pygame.K_UP] or keys[pygame.K_w]:
+                camera_y += move_speed
+            if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+                camera_y -= move_speed
 
             pygame.display.flip()
 
