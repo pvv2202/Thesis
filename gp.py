@@ -157,7 +157,7 @@ class Population:
                 best = max(metric)
 
             mad = median_absolute_deviation(metric)
-            eps = 1 * mad # 2 * mad for now. Something to test
+            eps = 2 * mad # 2 * mad for now. Something to test
 
             if minimize:
                 threshold = best + eps
@@ -225,7 +225,7 @@ class Population:
     #         # Randomly select from passing genomes unless we're on the max rounds at which point just return a random one
     #         return self.epsilon_lexicase(next, round + 1, max_rounds) if round < max_rounds else random.choice(next)
 
-    def forward_generation(self, test, method='tournament', size=5, max_rounds=5):
+    def forward_generation(self, test, method='tournament', size=5):
         '''Moves the population forward one generation'''
         # Sort the population by fitness. Higher fitness is better
         self.population.sort(key=lambda x: x.fitness[1], reverse=True) # Sort by accuracy currently
@@ -246,7 +246,7 @@ class Population:
                 for _ in range(self.size):
                     # Select a genome and make a deep copy. We pass results and a random sample of the population
                     #  genome.metrics = (loss, accuracy, network.flops, network.param_count)
-                    genome = self.epsilon_lexicase(self.population, test, metric_index=1, minimize=False)
+                    genome = self.epsilon_lexicase(self.population, test, metric_index=1, minimize=True) # Loss. Accuracy is 0
                     new_genome = copy.deepcopy(genome)
                     new_population.append(new_genome)
                 # Update the population
