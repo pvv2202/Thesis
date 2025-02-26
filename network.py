@@ -7,17 +7,17 @@ import math
 import pygame
 
 class Network:
-    def __init__(self, dag, params, device, recurrent=False):
-        '''Initialize network object'''
+    def __init__(self, dag, params, device, recurrences=None):
+        """Initialize network object"""
         self.dag = dag
         self.params = params
         self.device = device
         self.param_count = sum(p.numel() for p in self.params) # Number of elements across all parameter arrays
         self.flops = self.calculate_flops()
-        self.recurrent = recurrent
+        self.recurrences = recurrences
 
     def calculate_flops(self):
-        '''Calculate and return flops'''
+        """Calculate and return flops"""
         flops = 0
 
         # BFS
@@ -31,15 +31,11 @@ class Network:
         return flops
 
     @profile
-    def forward(self, x, h=None):
-        '''Forward pass through the graph'''
+    def forward(self, x):
+        """Forward pass through the graph"""
         # Load tensor into the root node
         self.dag.root.tensor = x
         out = self.dag.root
-
-        # Update hidden node if recurrent
-        if self.recurrent:
-            self.dag.hidden_node.tensor = h
 
         # Min heap (by layer) for the children of the root
         heap = []
@@ -63,7 +59,7 @@ class Network:
         return out.tensor  # Output is always the last processed node
 
     def loss(self, y_pred, y, loss_fn=torch.nn.functional.cross_entropy):
-        '''Calculate Loss'''
+        """Calculate Loss"""
         if y_pred is None:
             print("Invalid network")
             print(self.dag)
@@ -76,13 +72,9 @@ class Network:
 
         return loss_fn(y_pred_flat, y_flat)
 
-    def fit(self, train, test, epochs=3, learning_rate=0.001, loss_fn=torch.nn.functional.cross_entropy, optimizer_class=torch.optim.Adam, drought=False, generation=None, downsample=None):
-        '''Fit the model'''
-        if train == None:
-            print("No training data provided")
-            return
-
-        optimizer = optimizer_class(self.params, lr=learning_rate)
+    def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=torch.nn.functional.cross_entropy, optimizer=torch.optim.Adam, generation=None, downsample=None):
+        """Fit the model"""
+        optimizer = optimizer(self.params, lr=learning_rate)
         train_fraction = 1
         if generation:
             train_fraction = epochs*generation # Get fraction of data we want to train with
@@ -91,21 +83,23 @@ class Network:
             # Iterate over the training data, use tqdm to show a progress bar
             progress_bar = tqdm(train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch", colour="green")
 
-            # If recurrent, reset hidden node
-            if self.recurrent:
+            # Update hidden node if recurrent
+            if self.recurrences:
                 x, y = next(iter(train))
                 batch_dim = x.shape[0]
-                prev_y = torch.zeros(batch_dim, *self.dag.hidden_node.shape).to(self.device)
+                for awaiting, back in self.recurrences.items():
+                    awaiting.tensor = torch.tensor((batch_dim, *back.shape))  # Set awaiting's tensor to be the same as back's tensor
 
             for i, (x, y) in enumerate(progress_bar):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
 
-                if self.recurrent:
-                    y_pred = self.forward(x=x, h=prev_y)
-                    prev_y = y_pred.detach() # Detach to allow for backpropagation
-                else:
-                    y_pred = self.forward(x)
+                # Update awaiting tensors with previous values
+                if self.recurrences:
+                    for awaiting, back in self.recurrences.items():
+                        awaiting.tensor = back.tensor  # Set awaiting's tensor to be the same as back's tensor
+
+                y_pred = self.forward(x)
 
                 # Forward pass and compute loss
                 l = self.loss(y_pred, y, loss_fn)
@@ -125,17 +119,10 @@ class Network:
                     if fraction_done >= train_fraction:
                         return None
 
-                # If drought is on and we've trained on 25%, test to see if we stop here
-                # TODO: Hard-coded threshold for now
-                if drought and i == len(train) // 4:
-                    loss, accuracy, results = self.evaluate(test)
-                    if accuracy <= 0.15:
-                        return (loss, accuracy, results)
-
         return None
 
     def evaluate(self, test, loss_fn=torch.nn.functional.cross_entropy):
-        '''Evaluate the model on the test set. Returns loss, accuracy, results tuple'''
+        """Evaluate the model on the test set. Returns loss, accuracy, results tuple"""
         if test == None:
             print("No testing data provided")
             return
@@ -146,21 +133,23 @@ class Network:
 
         results = {}
 
-        # If recurrent, reset hidden node
-        if self.recurrent:
+        # Update hidden node if recurrent
+        if self.recurrences:
             x, y = next(iter(test))
             batch_dim = x.shape[0]
-            prev_y = torch.zeros(batch_dim, *self.dag.hidden_node.shape).to(self.device)
+            for awaiting, back in self.recurrences.items():
+                awaiting.tensor = torch.tensor((batch_dim, *back.shape))  # Set awaiting's tensor to be the same as back's tensor
 
         for x, y in test:
             x, y = x.to(self.device), y.to(self.device)
             # Forward pass and compute
             with torch.no_grad():
-                if self.recurrent:
-                    y_pred = self.forward(x=x, h=prev_y)
-                    prev_y = y_pred.detach() # Detach to allow for backpropagation
-                else:
-                    y_pred = self.forward(x)
+                # Update awaiting tensors with previous values
+                if self.recurrences:
+                    for awaiting, back in self.recurrences.items():
+                        awaiting.tensor = back.tensor  # Set awaiting's tensor to be the same as back's tensor
+
+                y_pred = self.forward(x)
 
                 # print("Prediction:")
                 # print(torch.max(y_pred, -1))
@@ -190,8 +179,12 @@ class Network:
 
         return total_loss, accuracy, results
 
+    #####################
+    ### Visualization ###
+    #####################
+
     def get_height_width(self):
-        '''Conducts a single forward pass of the graph and outputs a tuple (height, width)'''
+        """Conducts a single forward pass of the graph and outputs a tuple (height, width)"""
         height, width = 0, 0
 
         # Min heap (by layer) for the children of the root

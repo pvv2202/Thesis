@@ -59,10 +59,10 @@ class Instructions:
 
         # Calculate new dimension
         pop_shape = pop_node.shape
-        new_shape = (pop_shape[-1], pop_int)
+        weight_shape = (pop_shape[-1], pop_int)
 
         # Create weights
-        weights = torch.empty(new_shape, requires_grad=True, device=device)
+        weights = torch.empty(weight_shape, requires_grad=True, device=device)
         init.xavier_uniform_(weights)
         net['params'].append(weights) # Add weights to the parameters stack
 
@@ -74,7 +74,7 @@ class Instructions:
 
         # Create new node with the output shape of the matrix multiplication
         node = Node(
-            shape=utils.mult_shape(pop_shape, new_shape),
+            shape=utils.mult_shape(pop_shape, weight_shape),
             layer=pop_node.layer + 1,
             fn=matmul,
             parents=[pop_node],
@@ -222,45 +222,45 @@ class Instructions:
 
     # TODO: Add a weird convolution that doesn't use conv2d but uses matmul?
 
-    @staticmethod
-    def flatten(dag, net):
-        '''Flatten'''
-        # Do nothing if there aren't enough nodes in the stack
-        if len(net['nodes']) < 1:
-            return False
-
-        # Ensure top node has more than 1 dimension
-        if len(net['nodes'][0].shape) < 2:
-            return False
-
-        # Pop the top node from the stack
-        pop_node = net['nodes'].popleft()
-        last_shape = pop_node.shape
-
-        prod = 1
-        for x in last_shape:
-            prod *= x
-
-        # Define partial function
-        flatten_partial = partial(flatten, start_dim=1)
-
-        # Create new node
-        node = Node(
-            shape=(prod,),
-            layer=pop_node.layer + 1,
-            fn=flatten_partial,
-            parents=[pop_node],
-            desc="Flatten",
-            flops=0
-        )
-
-        # Add the new node to the graph
-        dag.add_edge(u=pop_node, v=node)
-
-        # Add new node to stack
-        net['nodes'].append(node)
-
-        return True
+    # @staticmethod
+    # def flatten(dag, net):
+    #     '''Flatten'''
+    #     # Do nothing if there aren't enough nodes in the stack
+    #     if len(net['nodes']) < 1:
+    #         return False
+    #
+    #     # Ensure top node has more than 1 dimension
+    #     if len(net['nodes'][0].shape) < 2:
+    #         return False
+    #
+    #     # Pop the top node from the stack
+    #     pop_node = net['nodes'].popleft()
+    #     last_shape = pop_node.shape
+    #
+    #     prod = 1
+    #     for x in last_shape:
+    #         prod *= x
+    #
+    #     # Define partial function
+    #     flatten_partial = partial(flatten, start_dim=1)
+    #
+    #     # Create new node
+    #     node = Node(
+    #         shape=(prod,),
+    #         layer=pop_node.layer + 1,
+    #         fn=flatten_partial,
+    #         parents=[pop_node],
+    #         desc="Flatten",
+    #         flops=0
+    #     )
+    #
+    #     # Add the new node to the graph
+    #     dag.add_edge(u=pop_node, v=node)
+    #
+    #     # Add new node to stack
+    #     net['nodes'].append(node)
+    #
+    #     return True
 
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod
@@ -412,6 +412,45 @@ class Instructions:
         return True
 
     #########################
+    ######## RNN Ops ########
+    #########################
+
+    @staticmethod
+    def await_connection(dag, net):
+        '''Create node waiting for a connection'''
+        if len(net['nodes']) < 1:
+            return False
+
+        # TODO: Right now this uses the previous node's shape. Should I pop from the stack instead?
+        ref = net['nodes'][0]
+        node = Node(
+            shape=ref.shape,
+            layer=ref.layer,
+            fn=id,
+            parents=[ref],
+            desc="Await Connection",
+            flops=0
+        )
+        dag.add_edge(u=ref, v=node)
+        net['nodes'].append(node)
+        net['awaiting_nodes'].append(node)
+
+        return True
+
+    @staticmethod
+    def back_connect(net):
+        '''Connect back to a node in a layer specified by int stack'''
+        # Do nothing if there aren't enough nodes in either stack or if the shapes aren't the same
+        if len(net['nodes']) < 1 or len(net['awaiting_nodes']) < 1 or net['nodes'][0].shape != net['awaiting_nodes'][0].shape:
+            return False
+
+        # Add awaiting, node to recurrence dictionary
+        awaiting = net['awaiting_nodes'].popleft()
+        net['recurrences'][awaiting] = net['nodes'][0]
+
+        return True
+
+    #########################
     ####### Stack Ops #######
     #########################
 
@@ -421,11 +460,11 @@ class Instructions:
         if len(net['nodes']) < 1:
             return False
 
-        ref = net['nodes'][0]
+        ref = net['nodes'][0] # Don't pop node from stack
         node = Node(
             shape=ref.shape,
             layer=ref.layer,
-            fn=dup,
+            fn=id,
             parents=[ref],
             desc="Dup",
             flops=0
@@ -435,15 +474,67 @@ class Instructions:
 
         return True
 
-    #########################
-    ######## RNN Ops ########
-    #########################
+    @staticmethod
+    def identity(dag, net):
+        '''Identity function on current node. New node will be on the next layer. Allows branches to progress asynchronously'''
+        if len(net['nodes']) < 1:
+            return False
+
+        ref = net['nodes'].popleft() # Pop node from stack
+        node = Node(
+            shape=ref.shape,
+            layer=ref.layer + 1,
+            fn=id,
+            parents=[ref],
+            desc="Identity",
+            flops=0
+        )
+        dag.add_edge(u=ref, v=node)
+        net['nodes'].append(node)
+
+        return True
+
+    @staticmethod
+    def for_n(stacks, separate_ints):
+        """For loop. Pop from sint stack. A closed parentheses means the end of the block"""
+        if separate_ints:
+            if len(stacks['sint']) < 1:
+                return False
+            n = stacks['sint'].pop()
+        else:
+            if len(stacks['int']) < 1:
+                return False
+            n = stacks['int'].pop()
+
+        if ')' in stacks['exec']:
+            index = stacks['exec'].index(')')
+        else:
+            index = -1  # Mimicking .find() behavior
+
+        # Get block to duplicate and insert it n time
+        block = stacks['exec'][:index]
+        for _ in range(n):
+            stacks['exec'].extend(block)
+
+        return True
 
     # @staticmethod
-    # def recurrence(dag, net, fn, desc, separate_ints):
-    #     '''Connect back to a node in a layer specified by sint/int stack'''
-    #     # Do nothing if there aren't enough ints in the stack
-    #     if separate_ints:
+    # def transpose(dag, net):
+    #     '''Transpose the top node on the node queue'''
+    #     if len(net['nodes']) < 1:
+    #         return False
+    #
+    #     ref = net['nodes'].popleft() # Pop node from stack
+    #     node = Node(
+    #         shape=ref.shape[::-1], # Transpose matrix (reverse shapes. Batch not included here so it's fine)
+    #         layer=ref.layer + 1,
+    #         fn=transpose,
+    #         parents=[ref],
+    #         desc="Transpose",
+    #         flops=0
+    #     )
+    #     dag.add_edge(u=ref, v=node)
+    #     net['nodes'].append(node)
 
     #########################
     ###### PyTorch Ops ######
@@ -512,4 +603,3 @@ class Instructions:
     # @staticmethod
     # def batch_norm(dag, net):
     #     '''Batch Normalization'''
-

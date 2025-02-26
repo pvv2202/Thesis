@@ -40,7 +40,6 @@ class DAG:
 
         # Add root node to graph
         self.root = root
-        self.hidden_node = None
         self.graph[root] = []
 
     def add_edge(self, u, v):

@@ -29,6 +29,8 @@ class Interpreter:
         # Network structures
         self.net = {
             'nodes': deque([]), # Queue holding nodes added to the graph
+            'awaiting_nodes': deque([]), # Queue holding nodes that are waiting for a backwards connection
+            'recurrences': {}, # Dictionary holding recurrences
             'params': [] # Parameter stack for PyTorch autograd
         }
 
@@ -71,7 +73,10 @@ class Interpreter:
             elif gene in self.instructions.instructions:
                 self.stacks['exec'].append(gene)
             elif type(gene) == str:
-                self.stacks['str'].append(gene)
+                if gene ==')': # Denotes end of a function
+                    continue
+                else:
+                    self.stacks['str'].append(gene)
 
     def run(self):
         '''Runs the program. Generates computation graph, prunes unnecessary nodes, and returns network'''
@@ -81,9 +86,6 @@ class Interpreter:
 
         if self.embedding:
             self.add_embedding(dag)
-
-        if self.recurrent:
-            self.add_hidden_state(dag)
 
         # Graph should be created after this
         while len(self.stacks['exec']) > 0:
@@ -104,12 +106,6 @@ class Interpreter:
                     self.net['nodes'].rotate(1)
                     self.instructions(dag, self.net, self.stacks, self.device, self.activation, self.separate_ints)
 
-
-            # if self.net['nodes'][-1].shape == None:
-            #     print(self.net['nodes'][-1].desc)
-            #     for parent in self.net['nodes'][-1].parents:
-            #         print(parent.shape)
-
         self.add_output(dag) # Add output layer
 
         # Create network
@@ -117,7 +113,7 @@ class Interpreter:
             dag=dag,
             params=self.net['params'],
             device=self.device,
-            recurrent=self.recurrent
+            recurrences=self.net['recurrences']
         )
         return network
 
@@ -133,27 +129,10 @@ class Interpreter:
         }
         self.net = {
             'nodes': deque([]),
+            'awaiting_nodes': deque([]),
+            'recurrences': {},
             'params': []
         }
-
-    def add_hidden_state(self, dag):
-        last_node = self.net['nodes'][0]  # Don't pop so we can use it with this node or others
-
-        # Add recurrent layer
-        hidden_node = Node(
-            shape=(self.output_shape),
-            layer=last_node.layer,
-            fn=None,
-            parents=[self.net['nodes'][0]],
-            desc="Hidden State",
-            flops=0,
-            weight_id=None
-        )
-
-        dag.hidden_node = hidden_node  # Add hidden node to graph
-
-        dag.add_edge(last_node, hidden_node)
-        self.net['nodes'].append(hidden_node)
 
     def add_embedding(self, dag):
         '''Adds an embedding layer to the input'''

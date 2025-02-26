@@ -23,8 +23,11 @@ def flatten(x, start_dim=1):
 def conv2d(x, kernel, bias, stride=1, padding='same', dilation=1):
     return F.conv2d(x, kernel, bias, stride, padding, dilation)
 
-def dup(x):
-    return x
+def id(x):
+    return x # Identity function
+
+def transpose(x):
+    return x.permute(0, *reversed(range(1, len(x.shape)))) # Transpose the tensor excluding the batch dimension
 
 def embedding(x, weights):
     if x.dtype != torch.long:

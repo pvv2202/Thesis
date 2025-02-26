@@ -7,6 +7,7 @@ import random
 import torch
 import copy
 import pickle
+import heapq
 
 # TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
 SINT_RANGE = (1, 5)
@@ -17,7 +18,7 @@ REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 ALPHA = 0.2 # Used for loss function with parameter count. Between 0 and 1. Higher means we weigh parameter count more
 
 class Genome:
-    '''Genome of a Push Program'''
+    """Genome of a Push Program"""
     def __init__(self, interpreter, instructions):
         self.genome = []
         self.fitness = 0
@@ -28,37 +29,38 @@ class Genome:
         self.results = {} # Results of the network on the test data
 
     def random_index(self):
-        '''Returns a random index in the genome'''
+        """Returns a random index in the genome"""
         return random.randint(0, len(self.genome))
 
     def initialize_random(self, num_genes):
-        '''Initializes the genome with random genes'''
+        """Initializes the genome with random genes"""
         # Add genes
         for _ in range(num_genes):
             self.genome.append(self.random_gene())
 
     def random_gene(self):
-        '''Returns a random gene'''
+        """Returns a random gene"""
         # Randomly select what type of thing to add
-        # TODO: Assign probabilities of adding each type. Ideally prevent the tiny matmuls
-        data_type = random.randint(0, 1)
+        data_type = random.random()
 
-        match data_type:
-            case 0:
-                int_type = random.randint(0, 1)
-                match int_type:
-                    case 0:
-                        return random.choice(INT_VALS) # Random multiple of input size
-                    case 1:
-                        return random.randint(*SINT_RANGE) # Random integer
-            case 1:
-                return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
+        if data_type < 0.45:
+            int_type = random.randint(0, 1)
+            match int_type:
+                case 0:
+                    return random.choice(INT_VALS)  # Random multiple of input size
+                case 1:
+                    return random.randint(*SINT_RANGE)  # Random integer
+        elif data_type < 0.9:
+            return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
 
-    def UMAD(self):
-        '''
+        else:
+            return ')'
+
+    def umad(self):
+        """
         Mutates the genome using UMAD. With some add probability, add a gene before or after each gene. Loop
         through genome again. With remove probability = add probability/(1 + add probability), remove a gene
-        '''
+        """
         # Add genes
         add_genome = []
         for gene in self.genome:
@@ -84,20 +86,20 @@ class Genome:
 
         # Redo if no changes were made
         if self.genome == new_genome:
-            self.UMAD()
+            self.umad()
 
         # Update genome
         self.genome = new_genome
 
     def transcribe(self):
-        '''Transcribes the genome to create a network. Returns the network'''
+        """Transcribes the genome to create a network. Returns the network"""
         self.interpreter.read_genome(self.genome) # Read genome (process it into stacks)
         self.network = self.interpreter.run() # Generate network object
         self.interpreter.clear() # Clear stacks
         return self.network
 
 class Population:
-    '''Population of Push Program Genomes'''
+    """Population of Push Program Genomes"""
     def __init__(self, size, num_initial_genes, input_shape, output_shape, activation, auto_bias, separate_ints, embedding=False, embed_dim=None, vocab_size=None, recurrent=False, out_file=None):
         self.size = size
         self.instructions = Instructions(activation=activation)
@@ -120,21 +122,21 @@ class Population:
             genome.initialize_random(num_initial_genes)
 
     def save(self, filename):
-        '''Saves the population to a file.'''
+        """Saves the population to a file."""
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
         print(f"Population saved to {filename}")
 
     @staticmethod
     def load(filename):
-        '''Loads a population from a file.'''
+        """Loads a population from a file."""
         with open(filename, 'rb') as file:
             population = pickle.load(file)
         print(f"Population loaded from {filename}")
         return population
 
     def tournament(self, size, minimize=False):
-        '''Selects the best genome from a tournament with size individuals'''
+        """Selects the best genome from a tournament with size individuals"""
         size = min(size, self.size) # Ensure size is not greater than the population size
         tournament = random.sample(self.population, size)
 
@@ -144,7 +146,7 @@ class Population:
             return max(tournament, key=lambda x: x.fitness[0]) # By accuracy
 
     def epsilon_lexicase(self, candidates, test, metric_index=0, minimize=False):
-        '''Selects the best genome using epsilon-lexicase selection'''
+        """Selects the best genome using epsilon-lexicase selection"""
         test_order = [i for i in range(len(test))] # Indices. Test batches aren't shuffled so indices work
         random.shuffle(test_order)
 
@@ -179,7 +181,10 @@ class Population:
                 return candidates[0]
 
             if not candidates:
-                return min(candidates, key=lambda g: g.results[t][metric_index])
+                if minimize:
+                    return min(candidates, key=lambda x: x.results[t][metric_index])
+                else:
+                    return max(candidates, key=lambda x: x.results[t][metric_index])
 
         # End cases
         if len(candidates) > 1:
@@ -189,44 +194,8 @@ class Population:
         else:
             return random.choice(candidates) # Randomly select from the population if nothing passed (shouldn't happen)
 
-    # def epsilon_lexicase(self, candidates, round, max_rounds, test):
-    #     '''Selects the best genome using epsilon lexicase selection'''
-    #     # Choose a random test case
-    #     batch = random.randint(0, len(test) - 1)
-    #
-    #     # Randomly select whether to use loss (0) or accuracy (1)
-    #     metric = random.choice([0, 1])
-    #
-    #     # Get the results for the test case
-    #     test_results = [genome.results[batch][metric] for genome in candidates] # Results of the form total loss, percent accuracy
-    #
-    #     # Calculate the median and median absolute deviation (MAD)
-    #     median = np.median(test_results)
-    #     mad = median_absolute_deviation(test_results)
-    #
-    #     # Define epsilon as a range around the median
-    #     epsilon = 2 * mad
-    #     lower_bound = median - epsilon
-    #     upper_bound = median + epsilon
-    #
-    #     # Get the fitness of each genome on the test case
-    #     next = [genome for genome in candidates if lower_bound <= genome.results[batch][metric] <= upper_bound]
-    #
-    #     # If no genomes pass, fallback to the best genome based on the test case
-    #     if not next:
-    #         if metric == 0:
-    #             return min(self.population, key=lambda genome: genome.results[batch][metric]) # Minimize loss
-    #         if metric == 1:
-    #             return max(self.population, key=lambda genome: genome.results[batch][metric]) # Maximize accuracy
-    #
-    #     if len(next) == 1:
-    #         return next[0]
-    #     else:
-    #         # Randomly select from passing genomes unless we're on the max rounds at which point just return a random one
-    #         return self.epsilon_lexicase(next, round + 1, max_rounds) if round < max_rounds else random.choice(next)
-
-    def forward_generation(self, test, method='tournament', size=5, max_rounds=5):
-        '''Moves the population forward one generation'''
+    def forward_generation(self, test, method='tournament', size=5):
+        """Moves the population forward one generation"""
         # Sort the population by fitness. Higher fitness is better
         self.population.sort(key=lambda x: x.fitness[1], reverse=True) # Sort by accuracy currently
         print([genome.fitness[1] for genome in self.population]) # Should print accuracy
@@ -256,13 +225,14 @@ class Population:
 
         # Mutate the new population
         for genome in self.population:
-            genome.UMAD()
+            genome.umad()
 
-    def run(self, train, test, generations, epochs, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, drought=False, increase_epochs=False, downsample=False):
-        '''Runs the population on the train and test data'''
+    def run(self, train, test, generations, epochs, loss_fn, optimizer=torch.optim.Adam, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, increase_epochs=False, downsample=False):
+        """Runs the population on the train and test data"""
         acc = []
         size = []
-        best_genome = (None, float('-inf'))
+        best_genomes = []
+        heapq.heapify(best_genomes)
         for gen_num in range(1, generations + 1):
             gen_acc = [] # Store accuracies for graphing
             gen_size = [] # Store sizes for graphing
@@ -293,11 +263,11 @@ class Population:
                     generation = None
 
                 # Train the network
-                res = network.fit(train=train, test=test, epochs=epochs, drought=drought, generation=generation, downsample=downsample)
+                res = network.fit(train=train, epochs=epochs, loss_fn=loss_fn, optimizer=optimizer, generation=generation, downsample=downsample)
 
                 # Evaluate the network, store results. Parameter count not used currently.
                 if res is None:
-                    loss, accuracy, results = network.evaluate(test=test)
+                    loss, accuracy, results = network.evaluate(test=test, loss_fn=loss_fn)
                 else:
                     loss, accuracy, results = res
 
@@ -306,9 +276,11 @@ class Population:
                 genome.metrics = (loss, accuracy, network.flops, network.param_count)
                 genome.results = results
 
-                # Update best genome
-                if accuracy > best_genome[1]:
-                    best_genome = (copy.deepcopy(genome), accuracy)
+                # Update best genomes
+                if len(best_genomes) < 100:
+                    heapq.heappush(best_genomes, (accuracy, copy.deepcopy(genome)))
+                else:
+                    heapq.heappushpop(best_genomes, (accuracy, copy.deepcopy(genome)))
 
                 gen_acc.append(accuracy)
                 print(f"Genome Accuracy: {accuracy}")
@@ -337,10 +309,11 @@ class Population:
             print(f"Generation {gen_num} Completed")
             print("--------------------------------------------------\n")
 
-            self.forward_generation(test, method=method, size=pool_size, max_rounds=5)
+            self.forward_generation(test, method=method, size=pool_size)
 
-        if best_genome[0] is not None:
-            print(f"Best genome: {best_genome[0].genome}")
+        # TODO: Evaluate this on the test set and then save the best performers to a file in order
+        # if best_genome[0] is not None:
+        #     print(f"Best genome: {best_genome[0].genome}")
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]

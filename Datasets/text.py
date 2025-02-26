@@ -26,7 +26,7 @@ class TextDataset(Dataset):
         return input_seq, target_seq
 
 # Load dataset
-full_dataset = TextDataset("../data/alice.txt", seq_length=20)
+full_dataset = TextDataset("data/alice.txt", seq_length=20)
 
 # Split into train (80%) and test (20%)
 train_size = int(0.8 * len(full_dataset))
@@ -91,7 +91,6 @@ pop.run(
     pool_size=15, # Number of individuals to select from the population for each selection into the next generation
     param_limit=50000000, # Maximum number of parameters allowed in a network
     flops_limit=5000000000, # Maximum number of FLOPs allowed in a network
-    drought=False, # Whether to use a drought mechanism that kills bad networks off early
     increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
     downsample=0.1 # Choose whether to downsample and by how much
 )
