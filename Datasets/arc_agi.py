@@ -93,17 +93,23 @@ x, y = next(iter(train_loader))
 # interpreter = gp.Interpreter(input_shape=input_shape, output_shape=output_shape, activation=None, auto_bias=False)
 # instructions = gp.Instructions(activation=None)
 # genome = gp.Genome(interpreter=interpreter, instructions=instructions)
+# genome.genome = ['await_connection', 'back_connect', 2, 'matmul_nodes', 'for_n', 'for_n', 'avgpool2d', 5, 'await_connection', 'mat_add', 5, 40, 4, 'avgpool2d', 'relu', 20, 'sigmoid', 'avgpool2d', '(']
+# network = genome.transcribe()
+# print(network)
+# network.visualize()
+# network.fit(epochs=1, train=train_loader)
 
 '''Population'''
 # pop = Population.load("pop.pkl")
 pop = gp.Population(
-    size=2, # Population size (number of individuals)
+    size=50, # Population size (number of individuals)
     num_initial_genes=20, # Number of genes to start with for each individual
     input_shape=input_shape, # Training data
     output_shape=output_shape, # Testing data
     activation=None, # Activation function to use (of None, no default activation function is used)
     auto_bias=False, # Whether to automatically add bias to the network
     separate_ints=True, # Whether to separate small integers from large integers in the stacks
+    mute_instructions=['await_connection', 'back_connect', 'for_n', 'flatten', 'transpose'], # Instructions to mute
     embedding=False,
     embed_dim=None,
     vocab_size=None,
@@ -112,11 +118,11 @@ pop = gp.Population(
 pop.run(
     train=train_loader, # Training data
     test=val_loader, # Validation data
-    generations=30, # Number of generations to run this population for
+    generations=100, # Number of generations to run this population for
     epochs=1, # Number of epochs to train each network for
-    loss_fn=torch.nn.CrossEntropyLoss(), # Loss function
+    loss_fn=torch.nn.functional.cross_entropy, # Loss function
     optimizer=torch.optim.Adam,
-    method='tournament', # Selection method
+    method='epsilon_lexicase', # Selection method
     pool_size=15, # Number of individuals to select from the population for each selection into the next generation
     param_limit=50000000, # Maximum number of parameters allowed in a network
     flops_limit=5000000000, # Maximum number of FLOPs allowed in a network

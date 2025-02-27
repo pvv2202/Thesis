@@ -11,7 +11,7 @@ import heapq
 
 # TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
 SINT_RANGE = (1, 5)
-INT_VALS = [8, 16, 32, 64, 128, 256]
+INT_VALS = [8, 10, 16, 20, 32, 40, 64, 80, 100, 128, 256]
 ADD_RATE = 0.05
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 # TODO: Experiment with alpha
@@ -19,14 +19,19 @@ ALPHA = 0.2 # Used for loss function with parameter count. Between 0 and 1. High
 
 class Genome:
     """Genome of a Push Program"""
-    def __init__(self, interpreter, instructions):
+    def __init__(self, interpreter, instructions, mute_instructions=None):
         self.genome = []
         self.fitness = 0
         self.metrics = (float('inf'), float('-inf'), float('inf')) # Loss, accuracy, parameter count
         self.interpreter = interpreter
         self.instructions = instructions
+        if mute_instructions is not None:
+            self.valid_instructions = [i for i in self.instructions.instructions if i not in mute_instructions]
+        else:
+            self.valid_instructions = self.instructions.instructions
+
         self.network = None
-        self.results = {} # Results of the network on the test data
+        self.results = [] # Results of the network on the test data
 
     def random_index(self):
         """Returns a random index in the genome"""
@@ -51,10 +56,10 @@ class Genome:
                 case 1:
                     return random.randint(*SINT_RANGE)  # Random integer
         elif data_type < 0.9:
-            return random.choice(self.instructions.instructions)  # Add instruction. Project to list for random.choice to work
+            return random.choice(self.valid_instructions)  # Add instruction. Project to list for random.choice to work
 
         else:
-            return ')'
+            return '('
 
     def umad(self):
         """
@@ -100,7 +105,9 @@ class Genome:
 
 class Population:
     """Population of Push Program Genomes"""
-    def __init__(self, size, num_initial_genes, input_shape, output_shape, activation, auto_bias, separate_ints, embedding=False, embed_dim=None, vocab_size=None, recurrent=False, out_file=None):
+    def __init__(self, size, num_initial_genes, input_shape, output_shape, activation, auto_bias,
+                 separate_ints, mute_instructions=None, embedding=False, embed_dim=None, vocab_size=None, recurrent=False,
+                 out_file=None):
         self.size = size
         self.instructions = Instructions(activation=activation)
         # Interpreter needs the data (for auto output) and a number of other toggleable options
@@ -115,7 +122,7 @@ class Population:
             vocab_size=vocab_size,
             recurrent=recurrent
         )
-        self.population = [Genome(self.interpreter, self.instructions) for _ in range(size)]
+        self.population = [Genome(self.interpreter, self.instructions, mute_instructions) for _ in range(size)]
         self.out_file = out_file
         # Initialize the population with random genes
         for genome in self.population:
@@ -227,12 +234,14 @@ class Population:
         for genome in self.population:
             genome.umad()
 
-    def run(self, train, test, generations, epochs, loss_fn, optimizer=torch.optim.Adam, method='tournament', pool_size=5, param_limit=1000000, flops_limit=50000000, increase_epochs=False, downsample=False):
+    def run(self, train, test, generations, epochs, loss_fn, optimizer=torch.optim.Adam, method='tournament',
+            pool_size=5, param_limit=1000000, flops_limit=50000000, increase_epochs=False, downsample=False):
         """Runs the population on the train and test data"""
         acc = []
         size = []
         best_genomes = []
         heapq.heapify(best_genomes)
+        counter = 0
         for gen_num in range(1, generations + 1):
             gen_acc = [] # Store accuracies for graphing
             gen_size = [] # Store sizes for graphing
@@ -263,24 +272,20 @@ class Population:
                     generation = None
 
                 # Train the network
-                res = network.fit(train=train, epochs=epochs, loss_fn=loss_fn, optimizer=optimizer, generation=generation, downsample=downsample)
-
-                # Evaluate the network, store results. Parameter count not used currently.
-                if res is None:
-                    loss, accuracy, results = network.evaluate(test=test, loss_fn=loss_fn)
-                else:
-                    loss, accuracy, results = res
-
+                network.fit(train=train, epochs=epochs, loss_fn=loss_fn, optimizer=optimizer, generation=generation, downsample=downsample)
+                loss, accuracy, results = network.evaluate(test=test, loss_fn=loss_fn)
                 param_max = max(param_max, network.param_count)
                 flops_max = max(flops_max, network.flops)
                 genome.metrics = (loss, accuracy, network.flops, network.param_count)
                 genome.results = results
 
-                # Update best genomes
+                # Update best genomes. Include counter to break ties
                 if len(best_genomes) < 100:
-                    heapq.heappush(best_genomes, (accuracy, copy.deepcopy(genome)))
+                    heapq.heappush(best_genomes, (accuracy, counter, copy.deepcopy(genome)))
                 else:
-                    heapq.heappushpop(best_genomes, (accuracy, copy.deepcopy(genome)))
+                    heapq.heappushpop(best_genomes, (accuracy, counter, copy.deepcopy(genome)))
+
+                counter += 1
 
                 gen_acc.append(accuracy)
                 print(f"Genome Accuracy: {accuracy}")

@@ -16,7 +16,8 @@ class Interpreter:
     Push Interpreter. By default, automatically adds relu and bias where applicable and
     separates small vs. large integers
     '''
-    def __init__(self, input_shape, output_shape, activation='relu', auto_bias=True, separate_ints=True, embedding=False, embed_dim=None, vocab_size=None, recurrent=False):
+    def __init__(self, input_shape, output_shape, activation='relu', auto_bias=True, separate_ints=True,
+                 embedding=False, embed_dim=None, vocab_size=None, recurrent=False):
         self.stacks = {
             'int': [], # Really just Natural numbers
             'sint': [], # Small integers
@@ -73,8 +74,8 @@ class Interpreter:
             elif gene in self.instructions.instructions:
                 self.stacks['exec'].append(gene)
             elif type(gene) == str:
-                if gene ==')': # Denotes end of a function
-                    continue
+                if gene =='(': # Denotes end of a function
+                    self.stacks['exec'].append(gene)
                 else:
                     self.stacks['str'].append(gene)
 
@@ -91,6 +92,11 @@ class Interpreter:
         while len(self.stacks['exec']) > 0:
             # Get next instruction
             instr = self.stacks['exec'].pop()
+
+            # If end of a block, just continue
+            if instr == '(':
+                continue
+
             # Execute instruction
             added = self.instructions(dag, self.net, self.stacks, self.device, instr, self.separate_ints)
 

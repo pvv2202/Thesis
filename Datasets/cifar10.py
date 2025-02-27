@@ -21,7 +21,6 @@ if __name__ == "__main__":
     # Define dataset sizes (e.g., 80% training, 20% validation)
     train_size = int(0.8 * len(train_dataset))
     val_size = len(train_dataset) - train_size
-
     # Split dataset into training and validation sets
     train_dataset, val_dataset = random_split(train_dataset, [train_size, val_size])
 
@@ -70,7 +69,7 @@ if __name__ == "__main__":
         epochs=1, # Number of epochs to train each network for
         loss_fn=torch.nn.CrossEntropyLoss(), # Loss function
         optimizer=torch.optim.Adam,
-        method='tournament', # Selection method
+        method='epsilon_lexicase', # Selection method
         pool_size=15, # Number of individuals to select from the population for each selection into the next generation
         param_limit=50000000, # Maximum number of parameters allowed in a network
         flops_limit=5000000000, # Maximum number of FLOPs allowed in a network

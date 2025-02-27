@@ -222,45 +222,45 @@ class Instructions:
 
     # TODO: Add a weird convolution that doesn't use conv2d but uses matmul?
 
-    # @staticmethod
-    # def flatten(dag, net):
-    #     '''Flatten'''
-    #     # Do nothing if there aren't enough nodes in the stack
-    #     if len(net['nodes']) < 1:
-    #         return False
-    #
-    #     # Ensure top node has more than 1 dimension
-    #     if len(net['nodes'][0].shape) < 2:
-    #         return False
-    #
-    #     # Pop the top node from the stack
-    #     pop_node = net['nodes'].popleft()
-    #     last_shape = pop_node.shape
-    #
-    #     prod = 1
-    #     for x in last_shape:
-    #         prod *= x
-    #
-    #     # Define partial function
-    #     flatten_partial = partial(flatten, start_dim=1)
-    #
-    #     # Create new node
-    #     node = Node(
-    #         shape=(prod,),
-    #         layer=pop_node.layer + 1,
-    #         fn=flatten_partial,
-    #         parents=[pop_node],
-    #         desc="Flatten",
-    #         flops=0
-    #     )
-    #
-    #     # Add the new node to the graph
-    #     dag.add_edge(u=pop_node, v=node)
-    #
-    #     # Add new node to stack
-    #     net['nodes'].append(node)
-    #
-    #     return True
+    @staticmethod
+    def flatten(dag, net):
+        '''Flatten'''
+        # Do nothing if there aren't enough nodes in the stack
+        if len(net['nodes']) < 1:
+            return False
+
+        # Ensure top node has more than 1 dimension
+        if len(net['nodes'][0].shape) < 2:
+            return False
+
+        # Pop the top node from the stack
+        pop_node = net['nodes'].popleft()
+        last_shape = pop_node.shape
+
+        prod = 1
+        for x in last_shape:
+            prod *= x
+
+        # Define partial function
+        flatten_partial = partial(flatten, start_dim=1)
+
+        # Create new node
+        node = Node(
+            shape=(prod,),
+            layer=pop_node.layer + 1,
+            fn=flatten_partial,
+            parents=[pop_node],
+            desc="Flatten",
+            flops=0
+        )
+
+        # Add the new node to the graph
+        dag.add_edge(u=pop_node, v=node)
+
+        # Add new node to stack
+        net['nodes'].append(node)
+
+        return True
 
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod
@@ -506,35 +506,38 @@ class Instructions:
                 return False
             n = stacks['int'].pop()
 
-        if ')' in stacks['exec']:
-            index = stacks['exec'].index(')')
+        # Get index of last '('
+        if '(' in stacks['exec']:
+            index = len(stacks['exec']) - 1 - stacks['exec'][::-1].index('(') # Get index of last '(' by reversing the list
         else:
-            index = -1  # Mimicking .find() behavior
+            index = 0
 
         # Get block to duplicate and insert it n time
-        block = stacks['exec'][:index]
+        block = stacks['exec'][index:]
         for _ in range(n):
             stacks['exec'].extend(block)
 
+        print("Works")
+
         return True
 
-    # @staticmethod
-    # def transpose(dag, net):
-    #     '''Transpose the top node on the node queue'''
-    #     if len(net['nodes']) < 1:
-    #         return False
-    #
-    #     ref = net['nodes'].popleft() # Pop node from stack
-    #     node = Node(
-    #         shape=ref.shape[::-1], # Transpose matrix (reverse shapes. Batch not included here so it's fine)
-    #         layer=ref.layer + 1,
-    #         fn=transpose,
-    #         parents=[ref],
-    #         desc="Transpose",
-    #         flops=0
-    #     )
-    #     dag.add_edge(u=ref, v=node)
-    #     net['nodes'].append(node)
+    @staticmethod
+    def transpose(dag, net):
+        '''Transpose the top node on the node queue'''
+        if len(net['nodes']) < 1:
+            return False
+
+        ref = net['nodes'].popleft() # Pop node from stack
+        node = Node(
+            shape=ref.shape[::-1], # Transpose matrix (reverse shapes. Batch not included here so it's fine)
+            layer=ref.layer + 1,
+            fn=transpose,
+            parents=[ref],
+            desc="Transpose",
+            flops=0
+        )
+        dag.add_edge(u=ref, v=node)
+        net['nodes'].append(node)
 
     #########################
     ###### PyTorch Ops ######

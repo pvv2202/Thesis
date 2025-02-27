@@ -67,10 +67,10 @@ class Network:
 
         # Flatten for cross entropy
         # (batch_size * seq_len, vocab_size) vs. (batch_size * seq_len)
-        y_pred_flat = y_pred.view(-1, y_pred.size(-1))  # (N, C)
-        y_flat = y.view(-1)  # (N,)
+        # y_pred_flat = y_pred.view(-1, y_pred.size(-1))  # (N, C)
+        # y_flat = y.view(-1)  # (N,)
 
-        return loss_fn(y_pred_flat, y_flat)
+        return loss_fn(y_pred, y)
 
     def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=torch.nn.functional.cross_entropy, optimizer=torch.optim.Adam, generation=None, downsample=None):
         """Fit the model"""
@@ -131,7 +131,7 @@ class Network:
         total_loss = 0
         test_sum = 0
 
-        results = {}
+        results = []
 
         # Update hidden node if recurrent
         if self.recurrences:
@@ -168,7 +168,7 @@ class Network:
                 _, predictions = torch.max(y_pred, -1) # Should always be last dimension (hence -1). Max, indices is the form
 
                 correct_predictions += (predictions == y).sum().item()
-                results[x] = (total_loss, correct_predictions / len(y)) # Store the total loss and accuracy for each batch
+                results.append((total_loss, correct_predictions / len(y))) # Store the total loss and accuracy for each batch
 
             # if i/len(self.test) >= 0.25:
             #     break
@@ -189,7 +189,7 @@ class Network:
 
         # Min heap (by layer) for the children of the root
         heap = []
-        count = 0  # Tie-breaker counter. Otherwise we get an error trying to compare nodes
+        count = 0  # Tie-breaker counter. Otherwise, we get an error trying to compare nodes
         for child in self.dag.graph[self.dag.root]:
             # Push a tuple of (layer, counter, node) into the heap
             heapq.heappush(heap, (child.layer, count, child))
