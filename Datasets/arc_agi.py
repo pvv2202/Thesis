@@ -102,8 +102,8 @@ x, y = next(iter(train_loader))
 '''Population'''
 # pop = Population.load("pop.pkl")
 pop = gp.Population(
-    size=50, # Population size (number of individuals)
-    num_initial_genes=20, # Number of genes to start with for each individual
+    size=1000, # Population size (number of individuals)
+    num_initial_genes=1, # Number of genes to start with for each individual
     input_shape=input_shape, # Training data
     output_shape=output_shape, # Testing data
     activation=None, # Activation function to use (of None, no default activation function is used)
@@ -118,7 +118,7 @@ pop = gp.Population(
 pop.run(
     train=train_loader, # Training data
     test=val_loader, # Validation data
-    generations=100, # Number of generations to run this population for
+    generations=200, # Number of generations to run this population for
     epochs=1, # Number of epochs to train each network for
     loss_fn=torch.nn.functional.cross_entropy, # Loss function
     optimizer=torch.optim.Adam,

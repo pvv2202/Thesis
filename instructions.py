@@ -550,7 +550,7 @@ class Instructions:
         if len(net['nodes']) < 1:
             return False
 
-        # TODO: Euclidean norm is indepotent. Any advantage to multiple relu or softmax? Should I assume?
+        # TODO: Euclidean norm is idempotent. Any advantage to multiple relu or softmax? Should I assume?
         # Don't allow redundant operations
         if net['nodes'][0].desc == desc:
             return False

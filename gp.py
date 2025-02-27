@@ -61,12 +61,13 @@ class Genome:
         else:
             return '('
 
-    def umad(self):
+    def umad(self, count=0):
         """
         Mutates the genome using UMAD. With some add probability, add a gene before or after each gene. Loop
         through genome again. With remove probability = add probability/(1 + add probability), remove a gene
         """
         # Add genes
+        # TODO: Maybe I want to have add on left/right equal chance instead of both in one add case? Try graphing best performers vs. size?
         add_genome = []
         for gene in self.genome:
             if random.random() <= ADD_RATE:
@@ -81,6 +82,11 @@ class Genome:
             else:
                 add_genome.append(gene)
 
+        # Handle special case where genome is empty
+        if len(self.genome) == 0:
+            if random.random() <= ADD_RATE:
+                self.genome.append(self.random_gene())
+
         # Remove genes
         new_genome = []
         for gene in add_genome:
@@ -89,9 +95,9 @@ class Genome:
                 continue
             new_genome.append(gene)
 
-        # Redo if no changes were made
-        if self.genome == new_genome:
-            self.umad()
+        # Redo if no changes were made. Only do this 100 times
+        if self.genome == new_genome and count < 100:
+            self.umad(count=count+1)
 
         # Update genome
         self.genome = new_genome
