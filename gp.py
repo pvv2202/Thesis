@@ -48,14 +48,14 @@ class Genome:
         # Randomly select what type of thing to add
         data_type = random.random()
 
-        if data_type < 0.5:
+        if data_type < 0.4:
             int_type = random.randint(0, 1)
             match int_type:
                 case 0:
                     return random.choice(INT_VALS)  # Random multiple of input size
                 case 1:
                     return random.randint(*SINT_RANGE)  # Random integer
-        elif data_type < 1.1:
+        elif data_type < 0.8:
             return random.choice(self.valid_instructions)  # Add instruction. Project to list for random.choice to work
 
         else:
@@ -257,6 +257,7 @@ class Population:
             param_max = 0
             flops_max = 0
             for genome in self.population:
+                print(genome.genome)
                 gen_size.append(len(genome.genome))
                 network = genome.transcribe()
 
