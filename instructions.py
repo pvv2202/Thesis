@@ -517,8 +517,6 @@ class Instructions:
         for _ in range(n):
             stacks['exec'].extend(block)
 
-        print("Works")
-
         return True
 
     @staticmethod

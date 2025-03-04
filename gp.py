@@ -10,8 +10,8 @@ import pickle
 import heapq
 
 # TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
-SINT_RANGE = (1, 5)
-INT_VALS = [8, 10, 16, 20, 32, 40, 64, 80, 100, 128, 256]
+SINT_RANGE = (2, 5)
+INT_VALS = [16, 32, 64, 128, 256]
 ADD_RATE = 0.05
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 # TODO: Experiment with alpha
@@ -48,59 +48,62 @@ class Genome:
         # Randomly select what type of thing to add
         data_type = random.random()
 
-        if data_type < 0.45:
+        if data_type < 0.5:
             int_type = random.randint(0, 1)
             match int_type:
                 case 0:
                     return random.choice(INT_VALS)  # Random multiple of input size
                 case 1:
                     return random.randint(*SINT_RANGE)  # Random integer
-        elif data_type < 0.9:
+        elif data_type < 1.1:
             return random.choice(self.valid_instructions)  # Add instruction. Project to list for random.choice to work
 
         else:
             return '('
 
-    def umad(self, count=0):
+    def umad(self, gen_num, count=0):
         """
         Mutates the genome using UMAD. With some add probability, add a gene before or after each gene. Loop
         through genome again. With remove probability = add probability/(1 + add probability), remove a gene
         """
         # Add genes
         # TODO: Maybe I want to have add on left/right equal chance instead of both in one add case? Try graphing best performers vs. size?
-        add_genome = []
-        for gene in self.genome:
-            if random.random() <= ADD_RATE:
-                if random.random() < 0.5:
-                    # Add before
-                    add_genome.append(gene)
-                    add_genome.append(self.random_gene())
+        if gen_num <= -1:
+            self.genome.insert(0, self.random_gene())
+        else:
+            add_genome = []
+            for gene in self.genome:
+                if random.random() <= ADD_RATE:
+                    if random.random() < 0.5:
+                        # Add before
+                        add_genome.append(gene)
+                        add_genome.append(self.random_gene())
+                    else:
+                        # Add after
+                        add_genome.append(self.random_gene())
+                        add_genome.append(gene)
                 else:
-                    # Add after
-                    add_genome.append(self.random_gene())
                     add_genome.append(gene)
-            else:
-                add_genome.append(gene)
 
-        # Handle special case where genome is empty
-        if len(self.genome) == 0:
-            if random.random() <= ADD_RATE:
-                self.genome.append(self.random_gene())
+            # Handle special case where genome is empty
+            if len(self.genome) == 0:
+                if random.random() <= ADD_RATE:
+                    self.genome.append(self.random_gene())
 
-        # Remove genes
-        new_genome = []
-        for gene in add_genome:
-            # If it's going to be removed, just don't add it
-            if random.random() <= REMOVE_RATE:
-                continue
-            new_genome.append(gene)
+            # Remove genes
+            new_genome = []
+            for gene in add_genome:
+                # If it's going to be removed, just don't add it
+                if random.random() <= REMOVE_RATE:
+                    continue
+                new_genome.append(gene)
 
-        # Redo if no changes were made. Only do this 100 times
-        if self.genome == new_genome and count < 100:
-            self.umad(count=count+1)
+            # Redo if no changes were made. Only do this 100 times
+            if self.genome == new_genome and count < 100:
+                self.umad(gen_num, count=count+1)
 
-        # Update genome
-        self.genome = new_genome
+            # Update genome
+            self.genome = new_genome
 
     def transcribe(self):
         """Transcribes the genome to create a network. Returns the network"""
@@ -207,7 +210,7 @@ class Population:
         else:
             return random.choice(candidates) # Randomly select from the population if nothing passed (shouldn't happen)
 
-    def forward_generation(self, test, method='tournament', size=5):
+    def forward_generation(self, test, gen_num, method='tournament', size=5):
         """Moves the population forward one generation"""
         # Sort the population by fitness. Higher fitness is better
         self.population.sort(key=lambda x: x.fitness[1], reverse=True) # Sort by accuracy currently
@@ -238,7 +241,7 @@ class Population:
 
         # Mutate the new population
         for genome in self.population:
-            genome.umad()
+            genome.umad(gen_num, count=0)
 
     def run(self, train, test, generations, epochs, loss_fn, optimizer=torch.optim.Adam, method='tournament',
             pool_size=5, param_limit=1000000, flops_limit=50000000, increase_epochs=False, downsample=False):
@@ -320,9 +323,11 @@ class Population:
             print(f"Generation {gen_num} Completed")
             print("--------------------------------------------------\n")
 
-            self.forward_generation(test, method=method, size=pool_size)
+            self.forward_generation(test, gen_num, method=method, size=pool_size)
 
         # TODO: Evaluate this on the test set and then save the best performers to a file in order
+        for genome in best_genomes:
+            print(genome[2].genome)
         # if best_genome[0] is not None:
         #     print(f"Best genome: {best_genome[0].genome}")
 
