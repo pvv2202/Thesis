@@ -51,7 +51,7 @@ if __name__ == "__main__":
     '''Population Example'''
     # pop = gp.Population.load("pop.pkl")
     pop = gp.Population(
-        size=500, # Population size (number of individuals)
+        size=250, # Population size (number of individuals)
         num_initial_genes=20, # Number of genes to start with for each individual
         input_shape=(3, 32, 32), # Training data
         output_shape=(10,), # Testing data

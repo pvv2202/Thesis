@@ -5,6 +5,7 @@ from dag import *
 from functions import *
 from network import Network
 import torch.nn.init as init
+import copy
 
 # Functions to be activated if activation is not None (default is relu)
 ACTIVE = ['matmul', 'conv2d']
@@ -12,10 +13,10 @@ ACTIVE = ['matmul', 'conv2d']
 BIAS = ['matmul']
 
 class Interpreter:
-    '''
+    """
     Push Interpreter. By default, automatically adds relu and bias where applicable and
     separates small vs. large integers
-    '''
+    """
     def __init__(self, input_shape, output_shape, activation='relu', auto_bias=True, separate_ints=True,
                  embedding=False, embed_dim=None, vocab_size=None, recurrent=False):
         self.stacks = {
@@ -56,31 +57,34 @@ class Interpreter:
         self.instructions = Instructions(activation=self.activation)
 
     def read_genome(self, genome):
-        '''Reads the genome and processes it into stacks'''
-        print(genome)
-        for gene in genome:
-            if type(gene) == int:
-                if self.separate_ints:
-                    if gene <= gp.SINT_RANGE[1]:
-                        self.stacks['sint'].append(gene)
-                    else:
-                        self.stacks['int'].append(gene)
+        """Reads genome into exec stack"""
+        self.stacks['exec'] = copy.deepcopy(genome)
+    def read_instr(self, instr, dag):
+        """Reads an instruction and processes it accordingly"""
+        if type(instr) == int:
+            if self.separate_ints:
+                if instr <= gp.SINT_RANGE[1]:
+                    self.stacks['sint'].append(instr)
                 else:
-                    self.stacks['int'].append(gene)
-            elif type(gene) == float:
-                self.stacks['float'].append(gene)
-            elif type(gene) == bool:
-                self.stacks['bool'].append(gene)
-            elif gene in self.instructions.instructions:
-                self.stacks['exec'].append(gene)
-            elif type(gene) == str:
-                if gene =='(': # Denotes end of a function
-                    self.stacks['exec'].append(gene)
-                else:
-                    self.stacks['str'].append(gene)
+                    self.stacks['int'].append(instr)
+            else:
+                self.stacks['int'].append(instr)
+        elif type(instr) == float:
+            self.stacks['float'].append(instr)
+        elif type(instr) == bool:
+            self.stacks['bool'].append(instr)
+        elif instr in self.instructions.instructions:
+            return self.instructions(dag, self.net, self.stacks, self.device, instr, self.separate_ints)
+        elif type(instr) == str:
+            if instr =='(': # Denotes end of a function
+                return True
+            else:
+                self.stacks['str'].append(instr)
+
+        return True
 
     def run(self):
-        '''Runs the program. Generates computation graph, prunes unnecessary nodes, and returns network'''
+        """Runs the program. Generates computation graph, prunes unnecessary nodes, and returns network"""
         root = Node(shape=self.input_shape, layer=0, fn=None) # Create root node with input shape, no function
         dag = DAG(root)
         self.net['nodes'].append(root)
@@ -93,12 +97,8 @@ class Interpreter:
             # Get next instruction
             instr = self.stacks['exec'].pop()
 
-            # If end of a block, just continue
-            if instr == '(':
-                continue
-
             # Execute instruction
-            added = self.instructions(dag, self.net, self.stacks, self.device, instr, self.separate_ints)
+            added = self.read_instr(instr, dag)
 
             # Add bias, activation if specified. Rotate because we can have multiple branches.
             # The added node will always be the last element and we need to make sure bias and activation operate on that
@@ -124,7 +124,7 @@ class Interpreter:
         return network
 
     def clear(self):
-        '''Clear current data in interpreter'''
+        """Clear current data in interpreter"""
         self.stacks = {
             'int': [],
             'sint': [],
@@ -141,7 +141,7 @@ class Interpreter:
         }
 
     def add_embedding(self, dag):
-        '''Adds an embedding layer to the input'''
+        """Adds an embedding layer to the input"""
         last_node = self.net['nodes'].popleft()
         last_shape = last_node.shape
 
@@ -163,7 +163,7 @@ class Interpreter:
         self.net['nodes'].append(node)
 
     def add_output(self, dag):
-        '''Adds the output layer to the DAG, There should always be at least 1 node in the stack'''
+        """Adds the output layer to the DAG, There should always be at least 1 node in the stack"""
         # Get the last node in the stack
         last_node = self.net['nodes'].popleft()
         last_shape = last_node.shape
