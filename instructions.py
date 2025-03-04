@@ -417,7 +417,7 @@ class Instructions:
             desc="Mat_Add_Nodes",
             flops=math.prod(pop_node1.shape)
         )
-        
+
         # Add whichever node is lower in the graph so that both will have been processed.
         if pop_node1.layer > pop_node2.layer:
             dag.add_edge(u=pop_node1, v=node)
@@ -530,8 +530,6 @@ class Instructions:
                 '(')  # Get index of last '(' by reversing the list
         else:
             index = 0
-
-        print(n)
 
         # Get block to duplicate and insert it n time
         block = stacks['exec'][index:]
