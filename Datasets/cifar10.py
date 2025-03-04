@@ -30,59 +30,59 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     '''Individual Tests'''
-    # interpreter = gp.Interpreter(input_shape=(3,32,32), output_shape=(10,), activation="relu", auto_bias=True)
-    # instructions = gp.Instructions(activation="relu")
-    # genome = gp.Genome(interpreter=interpreter, instructions=instructions)
-    # genome.genome = [
-    #     128, 'matmul_nodes', 'matmul', 'identity', 'matmul', 'conv2d', 'conv2d', 5, 'identity', 'identity', 'identity',
-    #      'mat_add', 5, 32, 3, 'flatten', 'conv2d', 'matmul_nodes', 'matmul', 4, 'identity', 'maxpool2d', 'mat_add',
-    #      'conv2d', 3
-    #     # 1, 'conv2d', 5, 2, 2, 'dup', 'matmul', 5, 3, 'maxpool2d', 128, 3, 256, 'maxpool2d', 'matmul_nodes', 'matmul_nodes', 32, 'matmul_nodes', 'mat_add_nodes', 'matmul_nodes', 'conv2d', 'mat_add', 'conv2d'
-    #     # 3, 3, 'mat_add', 8, 'matmul', 2, 128, 'conv2d', 'dup', 'avgpool2d', 'maxpool2d', 16, 'maxpool2d', 'conv2d', 4, 2, 16, 256, 'mat_add', 64
-    #     # 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'flatten', 'maxpool2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'maxpool2d', 'conv2d',
-    #     # 32, 64, 128, 256, 512, 1024, 512, 512, 256, 256, 128, 128, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
-    # ]
-    # network = genome.transcribe()
-    # print(network)
+    interpreter = gp.Interpreter(input_shape=(3,32,32), output_shape=(10,), activation="relu", auto_bias=True)
+    instructions = gp.Instructions(activation="relu")
+    genome = gp.Genome(interpreter=interpreter, instructions=instructions)
+    genome.genome = [
+        'maxpool2d', 256, 'for_n', 'flatten', 'avgpool2d', 16, 'maxpool2d', 4, 'for_n', '(', 2, '(', '(', 3,
+         'identity', 4, 'mat_add_nodes', 128, '(', 'matmul'
+
+        # 1, 'conv2d', 5, 2, 2, 'dup', 'matmul', 5, 3, 'maxpool2d', 128, 3, 256, 'maxpool2d', 'matmul_nodes', 'matmul_nodes', 32, 'matmul_nodes', 'mat_add_nodes', 'matmul_nodes', 'conv2d', 'mat_add', 'conv2d'
+        # 3, 3, 'mat_add', 8, 'matmul', 2, 128, 'conv2d', 'dup', 'avgpool2d', 'maxpool2d', 16, 'maxpool2d', 'conv2d', 4, 2, 16, 256, 'mat_add', 64
+        # 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'flatten', 'maxpool2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'maxpool2d', 'conv2d',
+        # 32, 64, 128, 256, 512, 1024, 512, 512, 256, 256, 128, 128, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+    ]
+    network = genome.transcribe()
+    print(network)
     # network.visualize()
-    # network.fit(epochs=50, train=train_loader)
-    # fitness = network.evaluate(test=test_loader)
+    network.fit(epochs=50, train=train_loader)
+    fitness = network.evaluate(test=test_loader)
 
     '''Population Example'''
-    # pop = gp.Population.load("pop.pkl")
-    pop = gp.Population(
-        size=250, # Population size (number of individuals)
-        num_initial_genes=20, # Number of genes to start with for each individual
-        input_shape=(3, 32, 32), # Training data
-        output_shape=(10,), # Testing data
-        activation="relu", # Activation function to use (of None, no default activation function is used)
-        auto_bias=True, # Whether to automatically add bias to the network
-        separate_ints=True, # Whether to separate small integers from large integers in the stacks
-        mute_instructions=['await_connection', 'back_connect', 'transpose'], # Instructions to mute
-        embedding=False,
-        embed_dim=None,
-        vocab_size=None,
-    )
-    # pop.save("pop.pkl")
-    pop.run(
-        train=train_loader, # Training data
-        test=val_loader, # Validation data
-        generations=10, # Number of generations to run this population for
-        epochs=1, # Number of epochs to train each network for
-        loss_fn=torch.nn.CrossEntropyLoss(), # Loss function
-        optimizer=torch.optim.Adam,
-        method='epsilon_lexicase', # Selection method
-        pool_size=15, # Number of individuals to select from the population for each selection into the next generation
-        param_limit=50000000, # Maximum number of parameters allowed in a network
-        flops_limit=100000000, # Maximum number of FLOPs allowed in a network
-        increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
-        downsample=0.1 # Choose whether to downsample and by how much
-    )
-
-    for genome in pop.population:
-        print(genome.fitness)
-        print(genome.genome)
-        print("")
+    # # pop = gp.Population.load("pop.pkl")
+    # pop = gp.Population(
+    #     size=250, # Population size (number of individuals)
+    #     num_initial_genes=20, # Number of genes to start with for each individual
+    #     input_shape=(3, 32, 32), # Training data
+    #     output_shape=(10,), # Testing data
+    #     activation="relu", # Activation function to use (of None, no default activation function is used)
+    #     auto_bias=True, # Whether to automatically add bias to the network
+    #     separate_ints=True, # Whether to separate small integers from large integers in the stacks
+    #     mute_instructions=['await_connection', 'back_connect', 'transpose'], # Instructions to mute
+    #     embedding=False,
+    #     embed_dim=None,
+    #     vocab_size=None,
+    # )
+    # # pop.save("pop.pkl")
+    # pop.run(
+    #     train=train_loader, # Training data
+    #     test=val_loader, # Validation data
+    #     generations=10, # Number of generations to run this population for
+    #     epochs=1, # Number of epochs to train each network for
+    #     loss_fn=torch.nn.CrossEntropyLoss(), # Loss function
+    #     optimizer=torch.optim.Adam,
+    #     method='epsilon_lexicase', # Selection method
+    #     pool_size=15, # Number of individuals to select from the population for each selection into the next generation
+    #     param_limit=50000000, # Maximum number of parameters allowed in a network
+    #     flops_limit=100000000, # Maximum number of FLOPs allowed in a network
+    #     increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
+    #     downsample=0.1 # Choose whether to downsample and by how much
+    # )
+    #
+    # for genome in pop.population:
+    #     print(genome.fitness)
+    #     print(genome.genome)
+    #     print("")
 
 # 0.5 Run:
 # Best genome: [1, 'conv2d', 5, 2, 2, 'dup', 'matmul', 5, 3, 'maxpool2d', 128, 3, 256, 'maxpool2d', 'matmul_nodes', 'matmul_nodes', 32, 'matmul_nodes', 'mat_add_nodes', 'matmul_nodes', 'conv2d', 'mat_add', 'conv2d']

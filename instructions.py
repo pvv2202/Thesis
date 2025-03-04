@@ -11,18 +11,26 @@ import torch.nn.init as init
 
 ACTIVATIONS = ['relu', 'sigmoid', 'softmax', 'tanh']
 
+
 class Instructions:
-    '''Instructions for the Push Interpreter. Returns True if instruction was successful (added to dag), False otherwise'''
+    """Instructions for the Push Interpreter. Returns True if instruction was successful (added to dag),
+    False otherwise"""
+
     def __init__(self, activation='relu'):
-        '''Initialize Instructions. If activation is None, all instructions are available. Otherwise, we exclude activation functions'''
+        """Initialize Instructions. If activation is None, all instructions are available. Otherwise, we exclude
+        activation functions"""
         # TODO: Run tests to see if this make sense.
         if activation is not None:
-            self.instructions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process") and func not in ACTIVATIONS]
+            self.instructions = [func for func in dir(self) if
+                                 callable(getattr(self, func)) and not func.startswith("__") and not func.startswith(
+                                     "process") and func not in ACTIVATIONS]
         else:
-            self.instructions  = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process")]
+            self.instructions = [func for func in dir(self) if
+                                 callable(getattr(self, func)) and not func.startswith("__") and not func.startswith(
+                                     "process")]
 
     def __call__(self, dag, net, stacks, device, instruction, separate_ints):
-        '''Call instruction on state'''
+        """Call instruction on state"""
         # Access the static method from the class, not the instance
         method = getattr(self.__class__, instruction)
         # Inspect the method's signature
@@ -48,7 +56,7 @@ class Instructions:
 
     @staticmethod
     def matmul(dag, net, stacks, device):
-        '''Matrix Multiplication'''
+        """Matrix Multiplication"""
         # Do nothing if there are no nodes or integers
         if len(net['nodes']) < 1 or len(stacks['int']) < 1 or len(net['nodes'][0].shape) < 1:
             return False
@@ -64,7 +72,7 @@ class Instructions:
         # Create weights
         weights = torch.empty(weight_shape, requires_grad=True, device=device)
         init.xavier_uniform_(weights)
-        net['params'].append(weights) # Add weights to the parameters stack
+        net['params'].append(weights)  # Add weights to the parameters stack
 
         # Calculate flops depending on dimension
         if len(pop_shape) < 2:
@@ -93,12 +101,12 @@ class Instructions:
 
     @staticmethod
     def matmul_nodes(dag, net):
-        '''Matrix Multiplication with Top 2 From Stack'''
-        # Do nothing if there aren't enough nodes in the stack or they're 1D
+        """Matrix Multiplication with Top 2 From Stack"""
+        # Do nothing if there aren't enough nodes in the stack, or they're 1D
         if len(net['nodes']) < 2 or len(net['nodes'][0].shape) < 2 or len(net['nodes'][1].shape) < 2:
             return False
 
-        # If not multiplicable, return (noop)
+        # If not multable, return (noop)
         if not utils.multable(net['nodes'][0].shape, net['nodes'][1].shape):
             return False
 
@@ -113,9 +121,9 @@ class Instructions:
             flops = (2 * pop_node1.shape[-1] * pop_node1.shape[-2] - 1) * pop_node2.shape[-1]
 
         # Create new node
-        node = Node (
-            shape=utils.mult_shape(pop_node1.shape, pop_node2.shape), # Get the shape of the resulting tensor
-            layer=max(pop_node1.layer, pop_node2.layer) + 1, # Take the max layer of the two nodes and add 1
+        node = Node(
+            shape=utils.mult_shape(pop_node1.shape, pop_node2.shape),  # Get the shape of the resulting tensor
+            layer=max(pop_node1.layer, pop_node2.layer) + 1,  # Take the max layer of the two nodes and add 1
             fn=matmul,
             parents=[pop_node1, pop_node2],
             desc="Matmul_Nodes",
@@ -139,7 +147,7 @@ class Instructions:
 
     @staticmethod
     def maxpool2d(dag, net):
-        '''2D Max Pooling'''
+        """2D Max Pooling"""
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 1:
             return False
@@ -149,14 +157,15 @@ class Instructions:
             return False
 
         # Check if max pooling is possible.
-        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2), stride=2):
+        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2),
+                                stride=2):
             return False
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
 
         # Define partial function
-        max_pool_partial = partial(max_pool, kernel_size=(2,2), stride=None, padding=0)
+        max_pool_partial = partial(max_pool, kernel_size=(2, 2), stride=None, padding=0)
 
         new_shape = utils.pool2d_shape(pop_node.shape, (2, 2), stride=2)
 
@@ -164,10 +173,12 @@ class Instructions:
         node = Node(
             shape=new_shape,
             layer=pop_node.layer + 1,
-            fn=max_pool_partial, # For now, hardcode kernel size and stride
+            fn=max_pool_partial,  # For now, hardcode kernel size and stride
             parents=[pop_node],
             desc="Maxpool2d",
-            flops=math.prod(new_shape) * (2 * 2 - 1)  # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output elements * comparisons/element
+            flops=math.prod(new_shape) * (2 * 2 - 1)
+            # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output
+            # elements * comparisons/element
         )
 
         # Add the new node to the graph
@@ -180,7 +191,7 @@ class Instructions:
 
     @staticmethod
     def avgpool2d(dag, net):
-        '''2D Average Pooling'''
+        """2D Average Pooling"""
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 1:
             return False
@@ -190,14 +201,15 @@ class Instructions:
             return False
 
         # Check if max pooling is possible.
-        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2), stride=2):
+        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2),
+                                stride=2):
             return False
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
 
         # Define partial function
-        avg_pool_partial = partial(avg_pool, kernel_size=(2,2), stride=None, padding=0)
+        avg_pool_partial = partial(avg_pool, kernel_size=(2, 2), stride=None, padding=0)
 
         new_shape = utils.pool2d_shape(pop_node.shape, (2, 2), stride=2)
 
@@ -205,10 +217,12 @@ class Instructions:
         node = Node(
             shape=new_shape,
             layer=pop_node.layer + 1,
-            fn=avg_pool_partial, # For now, hardcode kernel size and stride
+            fn=avg_pool_partial,  # For now, hardcode kernel size and stride
             parents=[pop_node],
             desc="Avgpool2d",
-            flops=math.prod(new_shape) * (2 * 2 - 1)  # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output elements * comparisons/element
+            flops=math.prod(new_shape) * (2 * 2 - 1)
+            # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output
+            # elements * comparisons/element
         )
 
         # Add the new node to the graph
@@ -219,12 +233,11 @@ class Instructions:
 
         return True
 
-
     # TODO: Add a weird convolution that doesn't use conv2d but uses matmul?
 
     @staticmethod
     def flatten(dag, net):
-        '''Flatten'''
+        """Flatten"""
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 1:
             return False
@@ -265,7 +278,7 @@ class Instructions:
     # TODO: Add support for asymmetry, dilation, variable stride.
     @staticmethod
     def conv2d(dag, net, stacks, device, separate_ints):
-        '''2D Convolution. Just uses PyTorch's conv2d. A bunch of code here but most is just checking for no-op'''
+        """2D Convolution. Just uses PyTorch's conv2d. A bunch of code here but most is just checking for no-op"""
         # First check we have enough nodes and integers
         if separate_ints:
             # Do nothing if there aren't enough nodes or integers (small and normal) in the stack
@@ -287,15 +300,18 @@ class Instructions:
             # Check if kernel size is valid. Can't be greater than either dimension along the input
             if stacks['sint'][-1] > net['nodes'][0].shape[-1] or stacks['sint'][-1] > net['nodes'][0].shape[-2]:
                 return False
-            # If we can't convolve, just return. Kernel will be int (out channels), node channels (int channels) sint, sint (kernel size = h, w)
-            if not utils.conv2dable(net['nodes'][0].shape, (stacks['int'][-1], net['nodes'][0].shape[1], stacks['sint'][-1], stacks['sint'][-1])):
+            # If we can't convolve, just return. Kernel will be int (out channels), node channels (int channels)
+            # sint, sint (kernel size = h, w)
+            if not utils.conv2dable(net['nodes'][0].shape, (
+                    stacks['int'][-1], net['nodes'][0].shape[1], stacks['sint'][-1], stacks['sint'][-1])):
                 return False
         else:
             # Check if kernel size is valid. Can't be greater than either dimension along the input
             if stacks['int'][-1] > net['nodes'][0].shape[-1] or stacks['int'][-1] > net['nodes'][0].shape[-2]:
                 return False
             # If we can't convolve, just return
-            if not utils.conv2dable(net['nodes'][0].shape, (stacks['int'][-2], net['nodes'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
+            if not utils.conv2dable(net['nodes'][0].shape, (
+                    stacks['int'][-2], net['nodes'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
                 return False
 
         # Pop the top node, kernel size, and number of filters from the stack
@@ -310,7 +326,8 @@ class Instructions:
 
         # Define the kernel shape based on the number of input and output channels
         in_channels = pop_node.shape[0]
-        kernel = torch.empty(num_filters, in_channels, kernel_size, kernel_size, requires_grad=True, device=device)  # (out_channels, in_channels, height, width)
+        kernel = torch.empty(num_filters, in_channels, kernel_size, kernel_size, requires_grad=True,
+                             device=device)  # (out_channels, in_channels, height, width)
         init.xavier_uniform_(kernel)
 
         # Bias term for each filter (output channel)
@@ -332,7 +349,8 @@ class Instructions:
             fn=conv2d_partial,
             parents=[pop_node],
             desc="Conv2d",
-            flops=(in_channels * (kernel_size**2) * 2 - 1) * math.prod(new_shape) # k * k multiplications, k * k - 1 additions for each output element.
+            flops=(in_channels * (kernel_size ** 2) * 2 - 1) * math.prod(new_shape)
+            # k * k multiplications, k * k - 1 additions for each output element.
         )
         dag.add_edge(u=pop_node, v=node)
 
@@ -346,7 +364,7 @@ class Instructions:
 
     @staticmethod
     def mat_add(dag, net, device):
-        '''Matrix Addition'''
+        """Matrix Addition"""
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 1:
             return False
@@ -357,19 +375,19 @@ class Instructions:
         # Create weights of same shape as popped node
         weights = torch.empty(pop_node.shape, requires_grad=True, device=device)
         init.zeros_(weights)
-        net['params'].append(weights) # Add weights to the parameters stack
+        net['params'].append(weights)  # Add weights to the parameters stack
 
         # Create new node
-        node = Node (
-            shape=pop_node.shape, # Shape is the same as the popped node
-            layer=pop_node.layer + 1, # Take the max layer of the two nodes and add 1
+        node = Node(
+            shape=pop_node.shape,  # Shape is the same as the popped node
+            layer=pop_node.layer + 1,  # Take the max layer of the two nodes and add 1
             fn=mat_add,
             parents=[pop_node],
             weight_id=len(net['params']) - 1,
             desc="Mat_Add",
             flops=math.prod(pop_node.shape)
         )
-        dag.add_edge(u=pop_node, v=node) # Edge between popped node and new node
+        dag.add_edge(u=pop_node, v=node)  # Edge between popped node and new node
 
         net['nodes'].append(node)
 
@@ -377,8 +395,7 @@ class Instructions:
 
     @staticmethod
     def mat_add_nodes(dag, net):
-        '''Matrix Addition of Nodes on Stack'''
-        # TODO: Can add unsqueezing to make these work. For now, ensure they are the same dimension
+        """Matrix Addition of Nodes on Stack"""
         # Do nothing if there aren't enough nodes in the stack
         if len(net['nodes']) < 2:
             return False
@@ -392,15 +409,15 @@ class Instructions:
         pop_node2 = net['nodes'].popleft()
 
         # Create new node
-        node = Node (
-            shape=utils.add_shape(pop_node1.shape, pop_node2.shape), # Get the shape of the resulting tensor
-            layer=max(pop_node1.layer, pop_node2.layer) + 1, # Take the max layer of the two nodes and add 1
+        node = Node(
+            shape=utils.add_shape(pop_node1.shape, pop_node2.shape),  # Get the shape of the resulting tensor
+            layer=max(pop_node1.layer, pop_node2.layer) + 1,  # Take the max layer of the two nodes and add 1
             fn=mat_add,
             parents=[pop_node1, pop_node2],
             desc="Mat_Add_Nodes",
             flops=math.prod(pop_node1.shape)
         )
-        # dag.add_edge(u=pop_node1, v=node) # TODO: Think about how to improve this so the graph representation makes more sense?
+        
         # Add whichever node is lower in the graph so that both will have been processed.
         if pop_node1.layer > pop_node2.layer:
             dag.add_edge(u=pop_node1, v=node)
@@ -417,7 +434,7 @@ class Instructions:
 
     @staticmethod
     def await_connection(dag, net):
-        '''Create node waiting for a connection'''
+        """Create node waiting for a connection"""
         if len(net['nodes']) < 1:
             return False
 
@@ -439,7 +456,7 @@ class Instructions:
 
     @staticmethod
     def back_connect(net):
-        '''Connect back to a node in a layer specified by int stack'''
+        """Connect back to a node in a layer specified by int stack"""
         # Do nothing if there aren't enough nodes in either stack or if the shapes aren't the same
         if len(net['nodes']) < 1 or len(net['awaiting_nodes']) < 1 or net['nodes'][0].shape != net['awaiting_nodes'][0].shape:
             return False
@@ -456,11 +473,11 @@ class Instructions:
 
     @staticmethod
     def dup(dag, net):
-        '''Duplicate the top node on the node queue'''
+        """Duplicate the top node on the node queue"""
         if len(net['nodes']) < 1:
             return False
 
-        ref = net['nodes'][0] # Don't pop node from stack
+        ref = net['nodes'][0]  # Don't pop node from stack
         node = Node(
             shape=ref.shape,
             layer=ref.layer,
@@ -476,11 +493,12 @@ class Instructions:
 
     @staticmethod
     def identity(dag, net):
-        '''Identity function on current node. New node will be on the next layer. Allows branches to progress asynchronously'''
+        """Identity function on current node. New node will be on the next layer. Allows branches to progress
+        asynchronously"""
         if len(net['nodes']) < 1:
             return False
 
-        ref = net['nodes'].popleft() # Pop node from stack
+        ref = net['nodes'].popleft()  # Pop node from stack
         node = Node(
             shape=ref.shape,
             layer=ref.layer + 1,
@@ -508,12 +526,16 @@ class Instructions:
 
         # Get index of last '('
         if '(' in stacks['exec']:
-            index = len(stacks['exec']) - 1 - stacks['exec'][::-1].index('(') # Get index of last '(' by reversing the list
+            index = len(stacks['exec']) - 1 - stacks['exec'][::-1].index(
+                '(')  # Get index of last '(' by reversing the list
         else:
             index = 0
 
+        print(n)
+
         # Get block to duplicate and insert it n time
         block = stacks['exec'][index:]
+        block = [x for x in block if x != 'for_n']  # Prevent nested loops
         for _ in range(n):
             stacks['exec'].extend(block)
 
@@ -521,13 +543,13 @@ class Instructions:
 
     @staticmethod
     def transpose(dag, net):
-        '''Transpose the top node on the node queue'''
+        """Transpose the top node on the node queue"""
         if len(net['nodes']) < 1:
             return False
 
-        ref = net['nodes'].popleft() # Pop node from stack
+        ref = net['nodes'].popleft()  # Pop node from stack
         node = Node(
-            shape=ref.shape[::-1], # Transpose matrix (reverse shapes. Batch not included here so it's fine)
+            shape=ref.shape[::-1],  # Transpose matrix (reverse shapes. Batch not included here so it's fine)
             layer=ref.layer + 1,
             fn=transpose,
             parents=[ref],
@@ -543,7 +565,7 @@ class Instructions:
 
     @staticmethod
     def process_torch_ops(dag, net, fn, desc):
-        '''Pop the top 2 tensors from the tensor stack'''
+        """Pop the top 2 tensors from the tensor stack"""
         # Do nothing if there aren't enough tensors in the stack
         if len(net['nodes']) < 1:
             return False
@@ -563,7 +585,7 @@ class Instructions:
             fn=fn,
             parents=[pop_node],
             desc=desc,
-            flops=math.prod(pop_node.shape) # TODO: For now just use the shape. Can expand on this later
+            flops=math.prod(pop_node.shape)  # TODO: For now just use the shape. Can expand on this later
         )
 
         # Add the new node to the graph
@@ -577,17 +599,17 @@ class Instructions:
     # Activation Functions
     @staticmethod
     def relu(dag, net):
-        '''ReLU Activation Function'''
+        """ReLU Activation Function"""
         Instructions.process_torch_ops(dag, net, torch.relu, "ReLU")
 
     @staticmethod
     def sigmoid(dag, net):
-        '''Sigmoid Activation Function'''
+        """Sigmoid Activation Function"""
         Instructions.process_torch_ops(dag, net, torch.sigmoid, "Sigmoid")
 
     @staticmethod
     def tanh(dag, net):
-        '''Tanh Activation Function'''
+        """Tanh Activation Function"""
         Instructions.process_torch_ops(dag, net, torch.tanh, "Tanh")
 
     # @staticmethod
