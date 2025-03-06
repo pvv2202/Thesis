@@ -1,7 +1,6 @@
 import numpy as np
-import random
+from collections import deque
 
-# TODO: Create tests for these functions
 def addable(shape1, shape2):
     '''
     Manually checks if two tensors are broadcast-compatible according to broadcasting rules.
@@ -189,5 +188,27 @@ def median_absolute_deviation(data):
     median = np.median(data)
     deviations = np.abs(data - median)
     return np.median(deviations)
+
+def topological_sort(graph):
+    """Do a topological sort of the graph using Kahn's Algorithm"""
+    in_degree = {} # Get the in-degree of each node (number of incoming edges)
+    for node, children in graph.items():
+        in_degree.setdefault(node, 0) # Have to do this for the root basically so it doesn't get skipped
+        for c in children:
+            in_degree[c] = in_degree.get(c, 0) + 1
+
+    # Kahn's Algorithm
+    queue = deque(node for node, deg in in_degree.items() if deg == 0) # Should just be the root for my case
+    order = [] # Order of nodes in the topological sort
+
+    while queue:
+        curr = queue.popleft()
+        order.append(curr)
+        for child in graph.get(curr, []):
+            in_degree[child] -= 1 # Subtract 1 from the in-degree of the child
+            if in_degree[child] == 0:
+                queue.append(child) # If we've seen everything already add it to the queue
+
+    return order
 
 

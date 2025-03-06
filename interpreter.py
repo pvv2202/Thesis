@@ -5,6 +5,7 @@ from dag import *
 from functions import *
 from network import Network
 import torch.nn.init as init
+import torch.nn as nn
 import copy
 
 # Functions to be activated if activation is not None (default is relu)
@@ -33,7 +34,6 @@ class Interpreter:
             'nodes': deque([]), # Queue holding nodes added to the graph
             'awaiting_nodes': deque([]), # Queue holding nodes that are waiting for a backwards connection
             'recurrences': {}, # Dictionary holding recurrences
-            'params': [] # Parameter stack for PyTorch autograd
         }
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -59,6 +59,7 @@ class Interpreter:
     def read_genome(self, genome):
         """Reads genome into exec stack"""
         self.stacks['exec'] = copy.deepcopy(genome)
+
     def read_instr(self, instr, dag):
         """Reads an instruction and processes it accordingly"""
         if type(instr) == int:
@@ -85,12 +86,13 @@ class Interpreter:
 
     def run(self):
         """Runs the program. Generates computation graph, prunes unnecessary nodes, and returns network"""
-        root = Node(shape=self.input_shape, layer=0, fn=None) # Create root node with input shape, no function
+        id_layer = nn.Identity()
+        root = Node(shape=self.input_shape, layer=0, fn=id_layer) # Create root node with input shape, no function
         dag = DAG(root)
         self.net['nodes'].append(root)
 
-        if self.embedding:
-            self.add_embedding(dag)
+        # if self.embedding:
+        #     self.add_embedding(dag)
 
         # Graph should be created after this
         while len(self.stacks['exec']) > 0:
@@ -117,9 +119,9 @@ class Interpreter:
         # Create network
         network = Network(
             dag=dag,
-            params=self.net['params'],
+            root=root,
+            recurrences=self.net['recurrences'],
             device=self.device,
-            recurrences=self.net['recurrences']
         )
         return network
 
@@ -137,30 +139,27 @@ class Interpreter:
             'nodes': deque([]),
             'awaiting_nodes': deque([]),
             'recurrences': {},
-            'params': []
         }
 
-    def add_embedding(self, dag):
-        """Adds an embedding layer to the input"""
-        last_node = self.net['nodes'].popleft()
-        last_shape = last_node.shape
-
-        weights = torch.empty(self.vocab_size, self.embed_dim, requires_grad=True, device=self.device)
-        init.xavier_uniform_(weights)
-        self.net['params'].append(weights)
-
-        node = Node(
-            shape=(last_shape[0], self.embed_dim),
-            layer=1, # Since this will only ever come after the root
-            fn=embedding,
-            parents=[last_node],
-            desc="Embedding",
-            flops=self.input_shape[0] * self.embed_dim,  # Approximate cost
-            weight_id=len(self.net['params'])-1
-        )
-
-        dag.add_edge(last_node, node)
-        self.net['nodes'].append(node)
+    # def add_embedding(self, dag):
+    #     """Adds an embedding layer to the input"""
+    #     last_node = self.net['nodes'].popleft()
+    #     last_shape = last_node.shape
+    #
+    #     weights = torch.empty(self.vocab_size, self.embed_dim, requires_grad=True, device=self.device)
+    #     init.xavier_uniform_(weights)
+    #     self.net['params'].append(weights)
+    #
+    #     node = Node(
+    #         shape=(last_shape[0], self.embed_dim),
+    #         layer=1, # Since this will only ever come after the root
+    #         fn=embedding,
+    #         desc="Embedding",
+    #         flops=self.input_shape[0] * self.embed_dim,  # Approximate cost
+    #     )
+    #
+    #     dag.add_edge(last_node, node)
+    #     self.net['nodes'].append(node)
 
     def add_output(self, dag):
         """Adds the output layer to the DAG, There should always be at least 1 node in the stack"""
@@ -170,6 +169,7 @@ class Interpreter:
         last_dim, output_dim = len(last_shape), len(self.output_shape)
 
         if last_dim < output_dim:
+            # TODO: Fix this
             # If last_dim < output_dim, we need project it up to the output dim.
             for _ in range(output_dim - last_dim):
                 # Add a node that unsqueezes the last dimension to the dag.
@@ -177,7 +177,6 @@ class Interpreter:
                     shape=last_shape + (1,),
                     layer=last_node.layer + 1,
                     fn=torch.unsqueeze,
-                    parents=[last_node],
                     desc="Unsqueeze",
                     flops=0
                 )
@@ -189,11 +188,12 @@ class Interpreter:
             for x in last_shape:
                 prod *= x
 
+            flatten_layer = nn.Flatten()
+
             node = Node(
                 shape=(prod,),
                 layer=last_node.layer + 1,
-                fn=flatten,
-                parents=[last_node],
+                fn=flatten_layer,
                 desc="Flatten",
                 flops=0
             )
@@ -201,23 +201,20 @@ class Interpreter:
             last_node = node
 
         last_shape = last_node.shape
-        # Add node that projects to the output shape. Need matrix. Result should be output_shape[-1]
-        weights = torch.empty(last_shape[-1], self.output_shape[-1], requires_grad=True, device=self.device)
-        init.xavier_uniform_(weights)
-        self.net['params'].append(weights)
 
         # Calculate flops depending on dimension
         if len(last_node.shape) < 2:
-            flops = (2 * last_node.shape[-1] - 1) * weights.shape[-1]
+            flops = (2 * last_node.shape[-1] - 1) * self.output_shape[-1]
         else:
-            flops = (2 * last_node.shape[-1] * last_node.shape[-2] - 1) * weights.shape[-1]
+            flops = (2 * last_node.shape[-1] * last_node.shape[-2] - 1) * self.output_shape[-1]
 
+        matmul_layer = nn.Linear(last_shape[-1], self.output_shape[-1], bias=False)
+
+        # Add node that projects to the output shape. Need matrix. Result should be output_shape[-1]
         node = Node(
-            shape=utils.mult_shape(last_node.shape, weights.shape),
+            shape=utils.mult_shape(last_node.shape, (last_shape[-1], self.output_shape[-1])),
             layer=last_node.layer + 1,
-            fn=matmul,
-            parents=[last_node],
-            weight_id=len(self.net['params'])-1,
+            fn=matmul_layer,
             desc="Matmul",
             flops=flops
         )
@@ -228,19 +225,4 @@ class Interpreter:
         # Due to different branches. There has to be only one final output when we conduct a forward pass
         dag.prune(node)
 
-        # TODO: Add support for activation functions
-        # last_node = node
-
-        # # Add activation function
-        # node = Node(
-        #     shape=self.output_shape,
-        #     layer=last_node.layer + 1,
-        #     fn=lambda x: torch.softmax(x, dim=1), # TODO: Need to update this. This assumes softmax but we should support other activation functions
-        #     parents=[last_node]
-        # )
-
-        # dag.add_edge(last_node, node)
-        # return dag
-
-        # We need the dimensions of the resulting matrix to = self.output_shape. This depends on the loss.
-        # Generally speaking, should probably be batch size x num_features.
+        # TODO: Support for activation functions?

@@ -1,37 +1,14 @@
-import torch
 import heapq
-from collections import deque
+from collections import defaultdict, deque
 
 class Node:
     """Node in a Directed, Acyclic Graph"""
-    def __init__(self, shape, layer, fn=None, parents=None, weight_id=None, desc=None, flops=0):
+    def __init__(self, shape, layer, fn=None, desc=None, flops=0):
         self.shape = shape # Output shape of this node after functions are applied
         self.layer = layer
         self.fn = fn
-        self.parents = parents
-        self.weight_id = weight_id
         self.desc = desc
-        self.tensor = None
         self.flops = flops
-
-    def execute(self, params, device):
-        """Execute the function on the input, store the result"""
-        # Do nothing if no function or parents have no tensor
-        if self.fn is None or any(parent.tensor is None for parent in self.parents):
-            return self.tensor
-
-        parent_tensors = [parent.tensor for parent in self.parents]
-
-        # Otherwise, execute the function
-        if self.weight_id is None:
-            self.tensor = self.fn(*parent_tensors)
-        else:
-            self.tensor = self.fn(*parent_tensors, params[self.weight_id])
-
-        # Send to device
-        self.tensor = self.tensor.to(device)
-
-        return self.tensor
 
 class DAG:
     """Directed, Acyclic Graph"""
@@ -55,6 +32,14 @@ class DAG:
         """Remove an edge from u to v"""
         self.graph[u].remove(v)
 
+    def get_parents(self):
+        """Return a dictionary of node: list of parents"""
+        parents = defaultdict(list) # Everything has an empty list as a parent to start
+        for node, children in self.graph.items():
+            for c in children:
+                parents[c].append(node) # Just add node as a parent of c
+        return dict(parents)
+
     def prune(self, node):
         """Prune all node that are not in the path from the root to node"""
         visited = set()
@@ -62,6 +47,7 @@ class DAG:
         counter = 0 # To break ties when layers are equal
 
         heapq.heappush(max_heap, (-node.layer, counter, node))
+        parents = self.get_parents()
         counter += 1
 
         # Max-Heap BFS from node to root so we explore by layer. Otherwise, we can have loop infinitely.
@@ -69,8 +55,8 @@ class DAG:
             _, _, current = heapq.heappop(max_heap)  # Extract node with the highest layer (breaking ties by counter)
             if current not in visited:
                 visited.add(current)
-                if current.parents:
-                    for parent in current.parents:
+                if current in parents and len(parents[current]) > 0: # If current node has parents
+                    for parent in parents[current]:
                         if parent not in visited:
                             heapq.heappush(max_heap, (-parent.layer, counter, parent))  # Tie-breaking with counter
                             counter += 1

@@ -6,11 +6,12 @@ from dag import *
 from functions import *
 import inspect
 import torch.nn.init as init
+import torch.nn as nn
+from custom_modules import *
 
 # TODO: Add a bool stack for things like bias in conv
 
 ACTIVATIONS = ['relu', 'sigmoid', 'softmax', 'tanh']
-
 
 class Instructions:
     """Instructions for the Push Interpreter. Returns True if instruction was successful (added to dag),
@@ -19,15 +20,10 @@ class Instructions:
     def __init__(self, activation='relu'):
         """Initialize Instructions. If activation is None, all instructions are available. Otherwise, we exclude
         activation functions"""
-        # TODO: Run tests to see if this make sense.
         if activation is not None:
-            self.instructions = [func for func in dir(self) if
-                                 callable(getattr(self, func)) and not func.startswith("__") and not func.startswith(
-                                     "process") and func not in ACTIVATIONS]
+            self.instructions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process") and func not in ACTIVATIONS]
         else:
-            self.instructions = [func for func in dir(self) if
-                                 callable(getattr(self, func)) and not func.startswith("__") and not func.startswith(
-                                     "process")]
+            self.instructions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__") and not func.startswith("process")]
 
     def __call__(self, dag, net, stacks, device, instruction, separate_ints):
         """Call instruction on state"""
@@ -69,24 +65,19 @@ class Instructions:
         pop_shape = pop_node.shape
         weight_shape = (pop_shape[-1], pop_int)
 
-        # Create weights
-        weights = torch.empty(weight_shape, requires_grad=True, device=device)
-        init.xavier_uniform_(weights)
-        net['params'].append(weights)  # Add weights to the parameters stack
-
         # Calculate flops depending on dimension
         if len(pop_shape) < 2:
             flops = (2 * pop_shape[-1] - 1) * pop_int
         else:
             flops = (2 * pop_shape[-1] * pop_shape[-2] - 1) * pop_int
 
+        matmul_layer = nn.Linear(pop_shape[-1], pop_int, bias=False).to(device)
+
         # Create new node with the output shape of the matrix multiplication
         node = Node(
             shape=utils.mult_shape(pop_shape, weight_shape),
             layer=pop_node.layer + 1,
-            fn=matmul,
-            parents=[pop_node],
-            weight_id=len(net['params']) - 1,
+            fn=matmul_layer,
             desc="Matmul",
             flops=flops
         )
@@ -94,8 +85,7 @@ class Instructions:
         # Add the new node to the graph
         dag.add_edge(u=pop_node, v=node)
 
-        # Add new node to stack
-        net['nodes'].append(node)
+        net['nodes'].append(node) # Add new node to stack
 
         return True
 
@@ -120,21 +110,20 @@ class Instructions:
         else:
             flops = (2 * pop_node1.shape[-1] * pop_node1.shape[-2] - 1) * pop_node2.shape[-1]
 
+        matmul_nodes_layer = MatmulNodes()
+
         # Create new node
         node = Node(
             shape=utils.mult_shape(pop_node1.shape, pop_node2.shape),  # Get the shape of the resulting tensor
             layer=max(pop_node1.layer, pop_node2.layer) + 1,  # Take the max layer of the two nodes and add 1
-            fn=matmul,
-            parents=[pop_node1, pop_node2],
+            fn=matmul_nodes_layer,
             desc="Matmul_Nodes",
             flops=flops
         )
 
         # Add whichever node is lower in the graph so that both will have been processed.
-        if pop_node1.layer > pop_node2.layer:
-            dag.add_edge(u=pop_node1, v=node)
-        else:
-            dag.add_edge(u=pop_node2, v=node)
+        dag.add_edge(u=pop_node1, v=node)
+        dag.add_edge(u=pop_node2, v=node)
 
         net['nodes'].append(node)
 
@@ -163,18 +152,14 @@ class Instructions:
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
-
-        # Define partial function
-        max_pool_partial = partial(max_pool, kernel_size=(2, 2), stride=None, padding=0)
-
         new_shape = utils.pool2d_shape(pop_node.shape, (2, 2), stride=2)
+        max_pool_layer = nn.MaxPool2d(kernel_size=(2, 2), stride=2)  # For now, hardcode kernel size and stride
 
         # Create new node
         node = Node(
             shape=new_shape,
             layer=pop_node.layer + 1,
-            fn=max_pool_partial,  # For now, hardcode kernel size and stride
-            parents=[pop_node],
+            fn=max_pool_layer,  # For now, hardcode kernel size and stride
             desc="Maxpool2d",
             flops=math.prod(new_shape) * (2 * 2 - 1)
             # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output
@@ -184,8 +169,7 @@ class Instructions:
         # Add the new node to the graph
         dag.add_edge(u=pop_node, v=node)
 
-        # Add new node to stack
-        net['nodes'].append(node)
+        net['nodes'].append(node) # Add new node to stack
 
         return True
 
@@ -201,35 +185,28 @@ class Instructions:
             return False
 
         # Check if max pooling is possible.
-        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2),
-                                stride=2):
+        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2), stride=2):
             return False
 
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
-
-        # Define partial function
-        avg_pool_partial = partial(avg_pool, kernel_size=(2, 2), stride=None, padding=0)
-
         new_shape = utils.pool2d_shape(pop_node.shape, (2, 2), stride=2)
+        avg_pool_layer = nn.AvgPool2d(kernel_size=(2, 2), stride=2) # For now, hardcode kernel size and stride
 
         # Create new node
         node = Node(
             shape=new_shape,
             layer=pop_node.layer + 1,
-            fn=avg_pool_partial,  # For now, hardcode kernel size and stride
-            parents=[pop_node],
+            fn=avg_pool_layer,
             desc="Avgpool2d",
             flops=math.prod(new_shape) * (2 * 2 - 1)
-            # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output
-            # elements * comparisons/element
+            # Comparisons are counted as 1. Make k * k - 1 comparisons for each output element. This is output elements * comparisons/element
         )
 
         # Add the new node to the graph
         dag.add_edge(u=pop_node, v=node)
 
-        # Add new node to stack
-        net['nodes'].append(node)
+        net['nodes'].append(node) # Add new node to stack
 
         return True
 
@@ -255,14 +232,13 @@ class Instructions:
             prod *= x
 
         # Define partial function
-        flatten_partial = partial(flatten, start_dim=1)
+        flatten_layer = nn.Flatten(start_dim=1)
 
         # Create new node
         node = Node(
             shape=(prod,),
             layer=pop_node.layer + 1,
-            fn=flatten_partial,
-            parents=[pop_node],
+            fn=flatten_layer,
             desc="Flatten",
             flops=0
         )
@@ -270,12 +246,11 @@ class Instructions:
         # Add the new node to the graph
         dag.add_edge(u=pop_node, v=node)
 
-        # Add new node to stack
-        net['nodes'].append(node)
+        net['nodes'].append(node) # Add new node to stack
 
         return True
 
-    # TODO: Add support for asymmetry, dilation, variable stride.
+    # TODO: Add dilation, variable stride?
     @staticmethod
     def conv2d(dag, net, stacks, device, separate_ints):
         """2D Convolution. Just uses PyTorch's conv2d. A bunch of code here but most is just checking for no-op"""
@@ -326,28 +301,23 @@ class Instructions:
 
         # Define the kernel shape based on the number of input and output channels
         in_channels = pop_node.shape[0]
-        kernel = torch.empty(num_filters, in_channels, kernel_size, kernel_size, requires_grad=True,
-                             device=device)  # (out_channels, in_channels, height, width)
-        init.xavier_uniform_(kernel)
 
-        # Bias term for each filter (output channel)
-        bias = torch.empty(num_filters, requires_grad=True, device=device)
-        init.zeros_(bias)
+        conv_layer = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=num_filters,
+            kernel_size=kernel_size,
+            stride=1,
+            padding='same',  # or whatever you want
+            bias=True
+        ).to(device)
 
-        # Add the kernel and bias to the 'params' stack
-        net['params'].extend([kernel, bias])
-
-        # Define partial convolution function
-        conv2d_partial = partial(conv2d, kernel=kernel, bias=bias, stride=1, padding='same', dilation=1)
-
-        new_shape = utils.conv2d_shape(pop_node.shape, kernel.shape)
+        new_shape = utils.conv2d_shape(pop_node.shape, (num_filters, in_channels, kernel_size, kernel_size), stride=1,)
 
         # TODO: Add different padding options?
         node = Node(
             shape=new_shape,
             layer=pop_node.layer + 1,
-            fn=conv2d_partial,
-            parents=[pop_node],
+            fn=conv_layer,
             desc="Conv2d",
             flops=(in_channels * (kernel_size ** 2) * 2 - 1) * math.prod(new_shape)
             # k * k multiplications, k * k - 1 additions for each output element.
@@ -372,18 +342,13 @@ class Instructions:
         # Pop the top node from the stack
         pop_node = net['nodes'].popleft()
 
-        # Create weights of same shape as popped node
-        weights = torch.empty(pop_node.shape, requires_grad=True, device=device)
-        init.zeros_(weights)
-        net['params'].append(weights)  # Add weights to the parameters stack
+        mat_add_layer = MatAddWeight(pop_node.shape).to(device)
 
         # Create new node
         node = Node(
             shape=pop_node.shape,  # Shape is the same as the popped node
             layer=pop_node.layer + 1,  # Take the max layer of the two nodes and add 1
-            fn=mat_add,
-            parents=[pop_node],
-            weight_id=len(net['params']) - 1,
+            fn=mat_add_layer,
             desc="Mat_Add",
             flops=math.prod(pop_node.shape)
         )
@@ -408,21 +373,19 @@ class Instructions:
         pop_node1 = net['nodes'].popleft()
         pop_node2 = net['nodes'].popleft()
 
+        mat_add_nodes_layer = MatAddNodes()
+
         # Create new node
         node = Node(
             shape=utils.add_shape(pop_node1.shape, pop_node2.shape),  # Get the shape of the resulting tensor
             layer=max(pop_node1.layer, pop_node2.layer) + 1,  # Take the max layer of the two nodes and add 1
-            fn=mat_add,
-            parents=[pop_node1, pop_node2],
+            fn=mat_add_nodes_layer,
             desc="Mat_Add_Nodes",
             flops=math.prod(pop_node1.shape)
         )
 
-        # Add whichever node is lower in the graph so that both will have been processed.
-        if pop_node1.layer > pop_node2.layer:
-            dag.add_edge(u=pop_node1, v=node)
-        else:
-            dag.add_edge(u=pop_node2, v=node)
+        dag.add_edge(u=pop_node1, v=node)
+        dag.add_edge(u=pop_node2, v=node)
 
         net['nodes'].append(node)
 
@@ -438,13 +401,14 @@ class Instructions:
         if len(net['nodes']) < 1:
             return False
 
+        id_layer = nn.Identity()
+
         # TODO: Right now this uses the previous node's shape. Should I pop from the stack instead?
         ref = net['nodes'][0]
         node = Node(
             shape=ref.shape,
             layer=ref.layer,
-            fn=id,
-            parents=[ref],
+            fn=id_layer,
             desc="Await Connection",
             flops=0
         )
@@ -477,12 +441,13 @@ class Instructions:
         if len(net['nodes']) < 1:
             return False
 
+        id_layer = nn.Identity()
+
         ref = net['nodes'][0]  # Don't pop node from stack
         node = Node(
             shape=ref.shape,
             layer=ref.layer,
-            fn=id,
-            parents=[ref],
+            fn=id_layer,
             desc="Dup",
             flops=0
         )
@@ -498,12 +463,13 @@ class Instructions:
         if len(net['nodes']) < 1:
             return False
 
+        id_layer = nn.Identity()
+
         ref = net['nodes'].popleft()  # Pop node from stack
         node = Node(
             shape=ref.shape,
             layer=ref.layer + 1,
-            fn=id,
-            parents=[ref],
+            fn=id_layer,
             desc="Identity",
             flops=0
         )
@@ -539,23 +505,22 @@ class Instructions:
 
         return True
 
-    @staticmethod
-    def transpose(dag, net):
-        """Transpose the top node on the node queue"""
-        if len(net['nodes']) < 1:
-            return False
-
-        ref = net['nodes'].popleft()  # Pop node from stack
-        node = Node(
-            shape=ref.shape[::-1],  # Transpose matrix (reverse shapes. Batch not included here so it's fine)
-            layer=ref.layer + 1,
-            fn=transpose,
-            parents=[ref],
-            desc="Transpose",
-            flops=0
-        )
-        dag.add_edge(u=ref, v=node)
-        net['nodes'].append(node)
+    # @staticmethod
+    # def transpose(dag, net):
+    #     """Transpose the top node on the node queue"""
+    #     if len(net['nodes']) < 1:
+    #         return False
+    #
+    #     ref = net['nodes'].popleft()  # Pop node from stack
+    #     node = Node(
+    #         shape=ref.shape[::-1],  # Transpose matrix (reverse shapes. Batch not included here so it's fine)
+    #         layer=ref.layer + 1,
+    #         fn=transpose,
+    #         desc="Transpose",
+    #         flops=0
+    #     )
+    #     dag.add_edge(u=ref, v=node)
+    #     net['nodes'].append(node)
 
     #########################
     ###### PyTorch Ops ######
@@ -581,7 +546,6 @@ class Instructions:
             shape=pop_node.shape,
             layer=pop_node.layer + 1,
             fn=fn,
-            parents=[pop_node],
             desc=desc,
             flops=math.prod(pop_node.shape)  # TODO: For now just use the shape. Can expand on this later
         )
@@ -598,17 +562,20 @@ class Instructions:
     @staticmethod
     def relu(dag, net):
         """ReLU Activation Function"""
-        Instructions.process_torch_ops(dag, net, torch.relu, "ReLU")
+        relu_layer = nn.ReLU()
+        Instructions.process_torch_ops(dag, net, relu_layer, "ReLU")
 
     @staticmethod
     def sigmoid(dag, net):
         """Sigmoid Activation Function"""
-        Instructions.process_torch_ops(dag, net, torch.sigmoid, "Sigmoid")
+        sigmoid_layer = nn.Sigmoid()
+        Instructions.process_torch_ops(dag, net, sigmoid_layer, "Sigmoid")
 
     @staticmethod
     def tanh(dag, net):
         """Tanh Activation Function"""
-        Instructions.process_torch_ops(dag, net, torch.tanh, "Tanh")
+        tanh_layer = nn.Tanh()
+        Instructions.process_torch_ops(dag, net, tanh_layer, "Tanh")
 
     # @staticmethod
     # def softmax(dag, net):
