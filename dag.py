@@ -69,11 +69,13 @@ class DAG:
 
     def __str__(self):
         """String representation of the DAG"""
+        # TODO: Fix this representation`
         heap = [] # Min heap (by layer) for the children of the root
         result = [] # List of strings to store the result
         layer_content = [] # Current layer content (to print by layer)
         count = 0  # Tie-breaker counter. Otherwise, we get an error trying to compare nodes
         curr_layer = 0
+        seen = set()
         for child in self.graph[self.root]:
             # Push a tuple of (layer, counter, node) into the heap
             heapq.heappush(heap, (child.layer, count, child))
@@ -90,8 +92,11 @@ class DAG:
             layer_content.append(f'Layer {node.layer}: {node.shape}; Fn: {node.desc}')
 
             for child in self.graph[node]:
+                if child in seen:
+                    continue
                 heapq.heappush(heap, (child.layer, count, child))
                 count += 1
+                seen.add(child)
 
         # Append any remaining content from the last layer
         if layer_content:

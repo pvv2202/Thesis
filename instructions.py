@@ -492,8 +492,7 @@ class Instructions:
 
         # Get index of last '('
         if '(' in stacks['exec']:
-            index = len(stacks['exec']) - 1 - stacks['exec'][::-1].index(
-                '(')  # Get index of last '(' by reversing the list
+            index = len(stacks['exec']) - 1 - stacks['exec'][::-1].index('(')  # Get index of last '(' by reversing the list
         else:
             index = 0
 
@@ -501,6 +500,7 @@ class Instructions:
         block = stacks['exec'][index:]
         block = [x for x in block if x != 'for_n']  # Prevent nested loops
         for _ in range(n):
+            print(stacks['exec'])
             stacks['exec'].extend(block)
 
         return True
@@ -521,6 +521,64 @@ class Instructions:
     #     )
     #     dag.add_edge(u=ref, v=node)
     #     net['nodes'].append(node)
+
+    #########################
+    ##### Normalization #####
+    #########################
+
+    @staticmethod
+    def layer_norm(dag, net):
+        """Layer Normalization"""
+        if len(net['nodes']) < 1:
+            return False
+
+        # Pop the top node from the stack
+        pop_node = net['nodes'].popleft()
+
+        # Define partial function
+        layer_norm = nn.LayerNorm(pop_node.shape)
+
+        # Create new node
+        node = Node(
+            shape=pop_node.shape,
+            layer=pop_node.layer + 1,
+            fn=layer_norm,
+            desc="Layer Norm",
+            flops=0
+        )
+
+        # Add the new node to the graph
+        dag.add_edge(u=pop_node, v=node)
+
+        net['nodes'].append(node)
+
+    @staticmethod
+    def batch_norm(dag, net):
+        """Batch Normalization"""
+        if len(net['nodes']) < 1:
+            return False
+
+        # Pop the top node from the stack
+        pop_node = net['nodes'].popleft()
+
+        if len(pop_node.shape) < 3:
+            batch_norm_layer = nn.BatchNorm1d(pop_node.shape[0])
+        else:
+            batch_norm_layer = nn.BatchNorm2d(pop_node.shape[0])
+
+        # Create new node
+        node = Node(
+            shape=pop_node.shape,
+            layer=pop_node.layer + 1,
+            fn=batch_norm_layer,
+            desc="Batch Norm",
+            flops=0
+        )
+
+        # Add the new node to the graph
+        dag.add_edge(u=pop_node, v=node)
+
+        net['nodes'].append(node)
 
     #########################
     ###### PyTorch Ops ######

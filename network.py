@@ -20,6 +20,7 @@ class Network(nn.Module):
         self.root = root
         self.parents = dag.get_parents()
         self.device = device
+        self.recurrences = recurrences
         self.flops = self.calculate_flops()
 
         # Get a linear order of nodes using topological sort
