@@ -41,28 +41,49 @@ class Network(nn.Module):
 
         self.param_count = sum(p.numel() for p in self.parameters())
 
-    def forward(self, x):
+    def forward(self, x, recurrent=False):
         """Forward pass through the network"""
-        # Store the output of each node. Initialize with root
-        outputs = {self.root: self.node_modules[self.node_to_name[self.root]](x)}
+        if not recurrent:
+            # Store the output of each node. Initialize with root
+            outputs = {self.root: self.node_modules[self.node_to_name[self.root]](x)}
 
-        for node in self.order:
-            if node == self.root:
-                continue
+            for node in self.order:
+                if node == self.root:
+                    continue
 
-            parents = self.parents[node] # Get the parents of the node
-            parent_tensors = [outputs[parent] for parent in parents] # Get the output tensors of the parents
+                parents = self.parents[node] # Get the parents of the node
+                parent_tensors = [outputs[parent] for parent in parents] # Get the output tensors of the parents
 
-            # Execute the function of the node
-            outputs[node] = self.node_modules[self.node_to_name[node]](*parent_tensors) # Execute the function on parent tensors
+                # Execute the function of the node
+                outputs[node] = self.node_modules[self.node_to_name[node]](*parent_tensors) # Execute the function on parent tensors
 
-        # Apply recurrences
-        for recurrent_node, source_node in self.recurrences.items():
-            outputs[recurrent_node] = outputs[source_node]
+            # Apply recurrences
+            for recurrent_node, source_node in self.recurrences.items():
+                outputs[recurrent_node] = outputs[source_node]
 
-        return outputs[self.order[-1]]  # Return the output of the last node
+            return outputs[self.order[-1]]  # Return the output of the last node
+        else: # So if it is recurrent
+            outputs = []
+            seq_length = x.size(1)
+            for t in range(seq_length):
+                x_t = x[:, t:t+1] # Get input at t and preserve batch dim
+                outputs.append({self.root: self.node_modules[self.node_to_name[self.root]](x_t)})
+                for node in self.order:
+                    if node == self.root:
+                        continue
 
-    def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None, downsample=None):
+                    parents = self.parents[node]
+                    parent_tensors = [outputs[t][parent] for parent in parents]
+                    outputs[t][node] = self.node_modules[self.node_to_name[node]](*parent_tensors)
+
+                    # Apply recurrences
+                    for recurrent_node, source_node in self.recurrences.items():
+                        outputs[t][recurrent_node] = outputs[t][source_node]
+
+            return torch.stack([outputs[t][self.order[-1]] for t in range(seq_length)], dim=1) # Return the outputs at each timestep
+
+    def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None,
+            downsample=None, recurrent=False, seq_length=5):
         """Fit the model"""
         optimizer = optimizer(self.parameters(), lr=learning_rate)
         self.to(self.device) # Move to GPU if applicable
@@ -73,23 +94,27 @@ class Network(nn.Module):
             train_fraction = epochs*generation # Get fraction of data we want to train with
 
         for epoch in range(epochs):
-            # progress bar
+            # Progress bar
             progress_bar = tqdm(train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch")
 
             for i, (x, y) in enumerate(progress_bar):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
 
-                # Forward pass
-                y_pred = self.forward(x)
+                if recurrent:
+                    # If recurrent, unroll through time (doing truncated BPTT so steps of seq_length)
+                    for t in range(0, x.size(1), seq_length):
+                        # Get the input and output for this time step but preserve batch dimension
+                        x_t = x[:, t:t + seq_length]
+                        y_t = y[:, t:t + seq_length]
+                        y_pred = self.forward(x_t, recurrent=True)
+                        loss = loss_fn(y_pred, y_t)
+                        loss.backward()
+                else:
+                    y_pred = self.forward(x)
+                    loss = loss_fn(y_pred, y)
+                    loss.backward()
 
-                # Get loss
-                loss = loss_fn(y_pred, y)
-
-                # Backpropagation
-                loss.backward()
-
-                # Update
                 optimizer.step()
 
                 progress_bar.set_postfix({"loss": float(loss.item())})

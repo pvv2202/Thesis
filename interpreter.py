@@ -45,6 +45,7 @@ class Interpreter:
         self.auto_bias = auto_bias
         self.separate_ints = separate_ints
 
+        # TODO: Use premade embeddings so just remove all of this? Unsure
         # Embedding parameters
         self.embedding = embedding
         self.embed_dim = embed_dim
@@ -91,8 +92,8 @@ class Interpreter:
         dag = DAG(root)
         self.net['nodes'].append(root)
 
-        # if self.embedding:
-        #     self.add_embedding(dag)
+        if self.embedding is not None:
+            self.add_embedding(dag)
 
         # Graph should be created after this
         while len(self.stacks['exec']) > 0:
@@ -141,25 +142,26 @@ class Interpreter:
             'recurrences': {},
         }
 
-    # def add_embedding(self, dag):
-    #     """Adds an embedding layer to the input"""
-    #     last_node = self.net['nodes'].popleft()
-    #     last_shape = last_node.shape
-    #
-    #     weights = torch.empty(self.vocab_size, self.embed_dim, requires_grad=True, device=self.device)
-    #     init.xavier_uniform_(weights)
-    #     self.net['params'].append(weights)
-    #
-    #     node = Node(
-    #         shape=(last_shape[0], self.embed_dim),
-    #         layer=1, # Since this will only ever come after the root
-    #         fn=embedding,
-    #         desc="Embedding",
-    #         flops=self.input_shape[0] * self.embed_dim,  # Approximate cost
-    #     )
-    #
-    #     dag.add_edge(last_node, node)
-    #     self.net['nodes'].append(node)
+    def add_embedding(self, dag):
+        """Adds an embedding layer to the input"""
+        last_node = self.net['nodes'].popleft()
+        last_shape = last_node.shape
+
+        weights = torch.empty(self.vocab_size, self.embed_dim, requires_grad=True, device=self.device)
+        init.xavier_uniform_(weights)
+        self.net['params'].append(weights)
+
+        # TODO: use self.embedding as the fn (so some kind of embedding module)
+        node = Node(
+            shape=(last_shape[0], self.embed_dim),
+            layer=1, # Since this will only ever come after the root
+            fn=embedding,
+            desc="Embedding",
+            flops=self.input_shape[0] * self.embed_dim,  # Approximate cost
+        )
+
+        dag.add_edge(last_node, node)
+        self.net['nodes'].append(node)
 
     def add_output(self, dag):
         """Adds the output layer to the DAG, There should always be at least 1 node in the stack"""
