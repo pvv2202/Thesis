@@ -10,9 +10,9 @@ import pickle
 import heapq
 
 # TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
-SINT_RANGE = (2, 5)
+SINT_RANGE = (1, 5)
 INT_VALS = [16, 32, 64, 128, 256]
-ADD_RATE = 0.05
+ADD_RATE = 0.08
 REMOVE_RATE = ADD_RATE/(1 + ADD_RATE)
 # TODO: Experiment with alpha
 ALPHA = 0.2 # Used for loss function with parameter count. Between 0 and 1. Higher means we weigh parameter count more
@@ -135,7 +135,7 @@ class Population:
         self.out_file = out_file
         # Initialize the population with random genes
         for genome in self.population:
-            genome.initialize_random(num_initial_genes)
+            genome.initialize_random(random.randint(*num_initial_genes))
 
     def save(self, filename):
         """Saves the population to a file."""
