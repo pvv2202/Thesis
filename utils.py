@@ -126,7 +126,7 @@ def batched_matmul_shape(shape1, shape2):
     result_shape = list(broadcast_shape) + [m1, n2]
     return tuple(result_shape)
 
-def conv2dable(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
+def conv2dable(matrix_shape, kernel_shape, stride=1, padding='same', dilation=1):
     '''
     Checks if a 2D convolution operation is possible between a tensor of shape matrix and a kernel of shape kernel.
     Supports asymmetric kernels and matrices. Bias is added by default.
@@ -137,7 +137,7 @@ def conv2dable(matrix_shape, kernel_shape, stride=1, padding=0, dilation=1):
 
     return True
 
-def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding='valid', dilation=1):
+def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding='same', dilation=1):
     '''
     Returns the shape of the resulting tensor from a 2D convolution operation
     between a tensor of shape matrix and a kernel of shape kernel. Supports
@@ -150,8 +150,8 @@ def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding='valid', dilation
     h_in, w_in = matrix_shape[-2:]
     c_ko, c_ki, h_k, w_k = kernel_shape
 
-    # Valid preserves the same shape
-    if padding == 'valid':
+    # Valid and same preserve the same shape
+    if padding in ['valid', 'same']:
         return (c_ko, h_in, w_in)
 
     # Compute the output dimensions
@@ -161,10 +161,16 @@ def conv2d_shape(matrix_shape, kernel_shape, stride=1, padding='valid', dilation
     # Return the output shape (batch/channel are the same)
     return (c_ko, h_out, w_out)
 
+def poolable(matrix_shape, kernel_size, stride=2):
+    """Returns whether a 2D pooling operation can be done"""
+    shape = pool2d_shape(matrix_shape, kernel_size, stride)
+    if shape is None or any(dim < 1 for dim in shape):
+        return False
+
+    return True
+
 def pool2d_shape(matrix_shape, kernel_size, stride=2):
-    '''
-    Returns the shape of the resulting tensor from a 2D pooling operation
-    '''
+    """Returns the shape of the resulting tensor from a 2D pooling operation"""
     # If the input is under 3D (channel, h, w), or the kernel is not 3D (channel, h, w), we no-op
     if len(matrix_shape) < 3:
         return None

@@ -62,7 +62,7 @@ class Network(nn.Module):
 
         return outputs[self.order[-1]]  # Return the output of the last node
 
-    def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None, downsample=None):
+    def fit(self, train, epochs=1, learning_rate=0.01, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None, downsample=None):
         """Fit the model"""
         optimizer = optimizer(self.parameters(), lr=learning_rate)
         self.to(self.device) # Move to GPU if applicable

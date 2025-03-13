@@ -146,8 +146,7 @@ class Instructions:
             return False
 
         # Check if max pooling is possible.
-        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2),
-                                stride=2):
+        if not utils.poolable(net['nodes'][0].shape, (2, 2), stride=2):
             return False
 
         # Pop the top node from the stack
@@ -185,7 +184,7 @@ class Instructions:
             return False
 
         # Check if max pooling is possible.
-        if not utils.conv2dable(net['nodes'][0].shape, (net['nodes'][0].shape[1], net['nodes'][0].shape[1], 2, 2), stride=2):
+        if not utils.poolable(net['nodes'][0].shape, (2, 2), stride=2):
             return False
 
         # Pop the top node from the stack
@@ -270,6 +269,8 @@ class Instructions:
         if len(net['nodes'][0].shape) < 3:
             return False
 
+        stride = 1 # Default stride
+
         # Check for valid kernel and whether we can convolve
         if separate_ints:
             # Check if kernel size is valid. Can't be greater than either dimension along the input
@@ -285,8 +286,7 @@ class Instructions:
             if stacks['int'][-1] > net['nodes'][0].shape[-1] or stacks['int'][-1] > net['nodes'][0].shape[-2]:
                 return False
             # If we can't convolve, just return
-            if not utils.conv2dable(net['nodes'][0].shape, (
-                    stacks['int'][-2], net['nodes'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
+            if not utils.conv2dable(net['nodes'][0].shape, (stacks['int'][-2], net['nodes'][0].shape[1], stacks['int'][-1], stacks['int'][-1])):
                 return False
 
         # Pop the top node, kernel size, and number of filters from the stack
@@ -299,6 +299,28 @@ class Instructions:
 
         num_filters = stacks['int'].pop()
 
+        padding = 'same'
+
+        # Check what stride will be and assign padding accordingly. Can't do same with stride > 1
+        if separate_ints:
+            if len(stacks['sint']) > 0 and stacks['sint'][-1] > 1:
+                padding = 0
+        else:
+            if len(stacks['int']) > 0 and stacks['int'][-1] > 1:
+                padding = 0
+
+        # Check if there is a valid stride in the int stack. If so, use that.
+        if separate_ints:
+            if len(stacks['sint']) > 0 and utils.conv2dable(pop_node.shape, (num_filters, pop_node.shape[1], kernel_size, kernel_size), stacks['sint'][-1], padding):
+                stride = stacks['sint'].pop()
+            else:
+                padding = 'same' # Reset padding if this doesn't work
+        else:
+            if len(stacks['int']) > 0 and utils.conv2dable(pop_node.shape, (num_filters, pop_node.shape[1], kernel_size, kernel_size), stacks['int'][-1], padding):
+                stride = stacks['int'].pop()
+            else:
+                padding = 'same'  # Reset padding if this doesn't work
+
         # Define the kernel shape based on the number of input and output channels
         in_channels = pop_node.shape[0]
 
@@ -306,12 +328,12 @@ class Instructions:
             in_channels=in_channels,
             out_channels=num_filters,
             kernel_size=kernel_size,
-            stride=1,
-            padding='same',  # or whatever you want
+            stride=stride,
+            padding=padding,
             bias=True
         ).to(device)
 
-        new_shape = utils.conv2d_shape(pop_node.shape, (num_filters, in_channels, kernel_size, kernel_size), stride=1,)
+        new_shape = utils.conv2d_shape(pop_node.shape, (num_filters, in_channels, kernel_size, kernel_size), padding=padding, stride=stride)
 
         # TODO: Add different padding options?
         node = Node(
@@ -500,7 +522,6 @@ class Instructions:
         block = stacks['exec'][index:]
         block = [x for x in block if x != 'for_n']  # Prevent nested loops
         for _ in range(n):
-            print(stacks['exec'])
             stacks['exec'].extend(block)
 
         return True

@@ -59,13 +59,14 @@ if __name__ == "__main__":
     '''Population Example'''
     # pop = Population.load("pop.pkl")
     pop = gp.Population(
-        size=100, # Population size (number of individuals)
-        num_initial_genes=20, # Number of genes to start with for each individual
+        size=50, # Population size (number of individuals)
+        num_initial_genes=(5, 50), # Number of genes to start with for each individual
         input_shape=(1, 28, 28), # Input shape
         output_shape=(10,), # Output shape
-        activation="relu", # Activation function to use (of None, no default activation function is used)
-        auto_bias=True, # Whether to automatically add bias to the network
+        activation=None, # Activation function to use (of None, no default activation function is used)
+        auto_bias=False, # Whether to automatically add bias to the network
         separate_ints=True, # Whether to separate small integers from large integers in the stacks
+        mute_instructions=['await_connection', 'back_connect', 'transpose'],  # Instructions to mute
         embedding=False,
         embed_dim=None,
         vocab_size=None,
@@ -74,15 +75,16 @@ if __name__ == "__main__":
     pop.run(
         train=train_loader, # Training data
         test=val_loader, # Validation data
-        generations=100, # Number of generations to run this population for
+        generations=50, # Number of generations to run this population for
         epochs=1, # Number of epochs to train each network for
+        loss_fn=torch.nn.CrossEntropyLoss(),  # Loss function
+        optimizer=torch.optim.Adam,
         method='epsilon-lexicase', # Selection method
         pool_size=100, # Number of individuals to select from the population for each selection into the next generation
         param_limit=50000000, # Maximum number of parameters allowed in a network
         flops_limit=5000000000, # Maximum number of FLOPs allowed in a network
-        drought=False, # Whether to use a drought mechanism that kills bad networks off early
         increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
-        downsample=0.1 # Choose whether to downsample and by how much
+        downsample=1 # Choose whether to downsample and by how much
     )
 
     for genome in pop.population:
