@@ -19,7 +19,7 @@ class Interpreter:
     separates small vs. large integers
     """
     def __init__(self, input_shape, output_shape, activation='relu', auto_bias=True, separate_ints=True,
-                 embedding=False, embed_dim=None, vocab_size=None, recurrent=False):
+                 embedding=None, embed_dim=None, vocab_size=None, recurrent=False):
         self.stacks = {
             'int': [], # Really just Natural numbers
             'sint': [], # Small integers
@@ -146,10 +146,6 @@ class Interpreter:
         """Adds an embedding layer to the input"""
         last_node = self.net['nodes'].popleft()
         last_shape = last_node.shape
-
-        weights = torch.empty(self.vocab_size, self.embed_dim, requires_grad=True, device=self.device)
-        init.xavier_uniform_(weights)
-        self.net['params'].append(weights)
 
         # TODO: use self.embedding as the fn (so some kind of embedding module)
         node = Node(

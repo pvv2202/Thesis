@@ -425,7 +425,6 @@ class Instructions:
 
         id_layer = nn.Identity()
 
-        # TODO: Right now this uses the previous node's shape. Should I pop from the stack instead?
         ref = net['nodes'][0]
         node = Node(
             shape=ref.shape,
@@ -512,17 +511,17 @@ class Instructions:
                 return False
             n = stacks['int'].pop()
 
-        # Get index of last '('
-        if '(' in stacks['exec']:
-            index = len(stacks['exec']) - 1 - stacks['exec'][::-1].index('(')  # Get index of last '(' by reversing the list
-        else:
-            index = 0
 
-        # Get block to duplicate and insert it n time
-        block = stacks['exec'][index:]
-        block = [x for x in block if x != 'for_n']  # Prevent nested loops
+        block = []
+        instruction = "for_n"
+        while instruction != '(':
+            stacks['exec'].pop()
+            if instruction != "for_n":
+                block.append(instruction)
+
         for _ in range(n):
-            stacks['exec'].extend(block)
+            for instruction in reversed(block): # Reversed since we're adding left to right originally
+                stacks['exec'].append(instruction)
 
         return True
 
