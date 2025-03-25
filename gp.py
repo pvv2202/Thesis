@@ -76,19 +76,19 @@ class Genome:
                 if random.random() <= ADD_RATE:
                     if random.random() < 0.5:
                         # Add before
-                        add_genome.append(gene)
                         add_genome.append(self.random_gene())
+                        add_genome.append(gene)
                     else:
                         # Add after
-                        add_genome.append(self.random_gene())
                         add_genome.append(gene)
+                        add_genome.append(self.random_gene())
                 else:
                     add_genome.append(gene)
 
             # Handle special case where genome is empty
             if len(self.genome) == 0:
                 if random.random() <= ADD_RATE:
-                    self.genome.append(self.random_gene())
+                    add_genome.append(self.random_gene())
 
             # Remove genes
             new_genome = []
@@ -175,7 +175,7 @@ class Population:
                 best = max(metric)
 
             mad = median_absolute_deviation(metric)
-            eps = 1 * mad # 2 * mad for now. Something to test
+            eps = 1 * mad # 1 * mad for now. Something to test
 
             if minimize:
                 threshold = best + eps
@@ -319,6 +319,11 @@ class Population:
 
             acc.append(gen_acc)
             size.append(gen_size)
+
+            # Save accuracy procedurally for graphing
+            if self.out_file is not None:
+                acc_csv = np.array(acc)
+                np.savetxt(self.out_file, acc_csv, delimiter=",")
 
             print("\n--------------------------------------------------")
             print(f"Generation {gen_num} Completed")
