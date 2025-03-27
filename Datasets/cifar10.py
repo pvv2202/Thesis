@@ -59,10 +59,10 @@ if __name__ == "__main__":
         auto_bias=True, # Whether to automatically add bias to the network
         separate_ints=True, # Whether to separate small integers from large integers in the stacks
         mute_instructions=['await_connection', 'back_connect', 'transpose'], # Instructions to mute
-        embedding=False,
+        embedding=None,
         embed_dim=None,
         vocab_size=None,
-        out_file="cifar10_lexicase_vast_50pop_20gen_1epoch.csv"
+        out_file="redo_cifar10_lexicase_vast_50pop_20gen_1epoch"
     )
     # pop.save("pop.pkl")
     pop.run(

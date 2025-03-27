@@ -514,7 +514,7 @@ class Instructions:
 
         block = []
         instruction = "for_n"
-        while instruction != '(':
+        while instruction != '(' and len(stacks['exec']) > 0:
             stacks['exec'].pop()
             if instruction != "for_n":
                 block.append(instruction)
