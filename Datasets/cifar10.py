@@ -34,19 +34,18 @@ if __name__ == "__main__":
     # instructions = gp.Instructions(activation="relu")
     # genome = gp.Genome(interpreter=interpreter, instructions=instructions)
     # genome.genome = [
-    #     '(', 'batch_norm', 'layer_norm', '(', 16, 'maxpool2d', 2, 32, 'avgpool2d', 64, 256, 'matmul', '(', 'conv2d',
-    #      'mat_add', 5, '(', 'maxpool2d', 128, '(', 'layer_norm', '(', 'batch_norm', '(', '(', 'maxpool2d', 'identity',
-    #      1, 'mat_add', 1, 5, 4, 'matmul_nodes', '(', 'matmul', 2, 'conv2d', 'identity', 128, 4
+    #     'avgpool2d', 32, 'identity', 'avgpool2d', 256, 'batch_norm', 'mat_add_nodes', 3, 2, 4, 'maxpool2d', 32, 4,
+    #      'mat_add', 32, 'layer_norm', 'conv2d', 'matmul_nodes', 'conv2d', 'layer_norm', 'mat_add_nodes', '(', 256,
+    #      'matmul', '(', 3, 'conv2d', 'maxpool2d', 'batch_norm', 'maxpool2d', 'conv2d', 'matmul_nodes', 4, 'batch_norm',
+    #      'conv2d', 256, 'identity', 128, 2, 32, 128
     #     # 1, 'conv2d', 5, 2, 2, 'dup', 'matmul', 5, 3, 'maxpool2d', 128, 3, 256, 'maxpool2d', 'matmul_nodes', 'matmul_nodes', 32, 'matmul_nodes', 'mat_add_nodes', 'matmul_nodes', 'conv2d', 'mat_add', 'conv2d'
     #     # 3, 3, 'mat_add', 8, 'matmul', 2, 128, 'conv2d', 'dup', 'avgpool2d', 'maxpool2d', 16, 'maxpool2d', 'conv2d', 4, 2, 16, 256, 'mat_add', 64
     #     # 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'flatten', 'maxpool2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'maxpool2d', 'conv2d',
     #     # 32, 64, 128, 256, 512, 1024, 512, 512, 256, 256, 128, 128, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
     # ]
-
     # network = genome.transcribe()
     # print(network)
-    # # network.visualize()
-    # network.fit(epochs=20, train=train_loader)
+    # network.fit(epochs=1, train=train_loader)
     # fitness = network.evaluate(test=test_loader)
 
     '''Population Example'''
@@ -63,7 +62,7 @@ if __name__ == "__main__":
         embedding=None,
         embed_dim=None,
         vocab_size=None,
-        out_file="cifar10_lexicase_vast_50pop_20gen_1epoch.csv"
+        out_file="redo_cifar10_lexicase_vast_50pop_20gen_1epoch"
     )
     # pop.save("pop.pkl")
     pop.run(

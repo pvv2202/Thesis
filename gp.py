@@ -8,6 +8,7 @@ import torch
 import copy
 import pickle
 import heapq
+import time
 
 # TODO: Choose mult values based on the input size. Basically just multiples of the input going in either direction. Good for speed, reduces amount of weird numbers
 SINT_RANGE = (1, 5)
@@ -246,14 +247,19 @@ class Population:
     def run(self, train, test, generations, epochs, loss_fn, optimizer=torch.optim.Adam, method='tournament',
             pool_size=5, param_limit=1000000, flops_limit=50000000, increase_epochs=False, downsample=False):
         """Runs the population on the train and test data"""
+        start = time.time()
         acc = []
+        l = []
         size = []
-        best_genomes = []
-        heapq.heapify(best_genomes)
+        best_genomes_acc = []
+        heapq.heapify(best_genomes_acc)
+        best_genomes_loss = []
+        heapq.heapify(best_genomes_loss)
         counter = 0
         for gen_num in range(1, generations + 1):
             gen_acc = [] # Store accuracies for graphing
             gen_size = [] # Store sizes for graphing
+            gen_loss = [] # Store losses for graphing
             param_max = 0
             flops_max = 0
             for genome in self.population:
@@ -290,14 +296,20 @@ class Population:
                 genome.results = results
 
                 # Update best genomes. Include counter to break ties
-                if len(best_genomes) < 100:
-                    heapq.heappush(best_genomes, (accuracy, counter, copy.deepcopy(genome)))
+                if len(best_genomes_acc) < 100:
+                    heapq.heappush(best_genomes_acc, (accuracy, counter, copy.deepcopy(genome)))
                 else:
-                    heapq.heappushpop(best_genomes, (accuracy, counter, copy.deepcopy(genome)))
+                    heapq.heappushpop(best_genomes_acc, (accuracy, counter, copy.deepcopy(genome)))
+
+                if len(best_genomes_loss) < 100:
+                    heapq.heappush(best_genomes_loss, (-loss, counter, copy.deepcopy(genome)))
+                else:
+                    heapq.heappushpop(best_genomes_loss, (-loss, counter, copy.deepcopy(genome)))
 
                 counter += 1
 
                 gen_acc.append(accuracy)
+                gen_loss.append(loss)
                 print(f"Genome Accuracy: {accuracy}")
                 print(f"Genome Loss: {loss}")
 
@@ -306,18 +318,15 @@ class Population:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-            # Update fitness using normalized flops
+            # Update fitness using normalized flops. Don't actually need this anymore
             for genome in self.population:
-                p_norm = genome.metrics[2] / flops_max # Just flops / flops max
                 genome.fitness = (
-                    # # TODO: Normalization may not be good for loss. Probably too small
-                    # (1 - ALPHA) * genome.metrics[1] + ALPHA * p_norm, # Loss
-                    # (1 - ALPHA) * genome.metrics[0] - ALPHA * p_norm, # Accuracy
                     genome.metrics[1],
                     genome.metrics[0]
                 )
 
             acc.append(gen_acc)
+            l.append(gen_loss)
             size.append(gen_size)
 
             # Save accuracy procedurally for graphing
@@ -331,11 +340,17 @@ class Population:
 
             self.forward_generation(test, gen_num, method=method, size=pool_size)
 
-        # TODO: Evaluate this on the test set and then save the best performers to a file in order
-        for genome in best_genomes:
+        print(f"EXECUTION TIME: {time.time() - start} seconds")
+
+        print("BEST BY ACCURACY")
+        for genome in best_genomes_acc:
+            print(genome[0])
             print(genome[2].genome)
-        # if best_genome[0] is not None:
-        #     print(f"Best genome: {best_genome[0].genome}")
+
+        print("BEST BY LOSS")
+        for genome in best_genomes_loss:
+            print(-genome[0])
+            print(genome[2].genome)
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]
@@ -343,6 +358,25 @@ class Population:
         # Create box plot for size
         plt.figure(figsize=(10, 6))  # Adjust width and height as needed
         size_plot = plt.boxplot(size,
+                                vert=True,
+                                patch_artist=True,
+                                labels=labels,
+                                showmeans=True,
+                                meanprops=dict(marker='.', markerfacecolor='black', markeredgecolor='black'),
+                                medianprops=dict(color='blue'),
+                                whiskerprops=dict(color='black'),
+                                capprops=dict(color='black'),
+                                boxprops=dict(facecolor='lavender', color='black'),
+                                flierprops=dict(markerfacecolor='green', marker='D'))
+        plt.title('Box Plot of Size Over Generations')
+        plt.xlabel('Generation')
+        plt.ylabel('Size (Number of Genes)')
+        plt.tight_layout()  # Automatically adjusts layout to fit elements
+        plt.show()
+
+        # Create box plot for loss
+        plt.figure(figsize=(10, 6))  # Adjust width and height as needed
+        size_plot = plt.boxplot(l,
                                 vert=True,
                                 patch_artist=True,
                                 labels=labels,
@@ -381,4 +415,14 @@ class Population:
         # Save accuracy data to csv file for excel plotting
         if self.out_file is not None:
             acc_csv = np.array(acc)
-            np.savetxt(self.out_file, acc_csv, delimiter=",")
+            np.savetxt(f"{self.out_file}_acc.csv", acc_csv, delimiter=",")
+
+        # Save loss data to csv file for excel plotting
+        if self.out_file is not None:
+            acc_csv = np.array(l)
+            np.savetxt(f"{self.out_file}_loss.csv", acc_csv, delimiter=",")
+
+        # Save size data to csv file for excel plotting
+        if self.out_file is not None:
+            acc_csv = np.array(size)
+            np.savetxt(f"{self.out_file}_size.csv", acc_csv, delimiter=",")
