@@ -116,7 +116,7 @@ class Genome:
 class Population:
     """Population of Push Program Genomes"""
     def __init__(self, size, num_initial_genes, input_shape, output_shape, activation, auto_bias,
-                 separate_ints, mute_instructions=None, embedding=False, embed_dim=None, vocab_size=None, recurrent=False,
+                 separate_ints, mute_instructions=None, embedding=False, embed_dim=None, recurrent=False,
                  out_file=None):
         self.size = size
         self.instructions = Instructions(activation=activation)
@@ -124,12 +124,12 @@ class Population:
         self.interpreter = Interpreter(
             input_shape=input_shape,
             output_shape=output_shape,
+            instructions=self.instructions,
             activation=activation,
             auto_bias=auto_bias,
             separate_ints=separate_ints,
             embedding=embedding,
             embed_dim=embed_dim,
-            vocab_size=vocab_size,
             recurrent=recurrent
         )
         self.population = [Genome(self.interpreter, self.instructions, mute_instructions) for _ in range(size)]

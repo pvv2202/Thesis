@@ -40,7 +40,7 @@ class DAG:
                 parents[c].append(node) # Just add node as a parent of c
         return dict(parents)
 
-    def prune(self, node):
+    def prune(self, node, recurrences):
         """Prune all node that are not in the path from the root to node"""
         visited = set()
         max_heap = []

@@ -30,8 +30,8 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     '''Individual Tests'''
-    # interpreter = gp.Interpreter(input_shape=(3,32,32), output_shape=(10,), activation=None, auto_bias=False)
-    # instructions = gp.Instructions(activation="relu")
+    # instructions = gp.Instructions(activation=None)
+    # interpreter = gp.Interpreter(input_shape=(3,32,32), output_shape=(10,), instructions = instructions, activation=None, auto_bias=False)
     # genome = gp.Genome(interpreter=interpreter, instructions=instructions)
     # genome.genome = [
     #     'avgpool2d', 32, 'identity', 'avgpool2d', 256, 'batch_norm', 'mat_add_nodes', 3, 2, 4, 'maxpool2d', 32, 4,
@@ -55,13 +55,12 @@ if __name__ == "__main__":
         num_initial_genes=(5, 100), # Number of genes to start with for each individual
         input_shape=(3, 32, 32), # Training data
         output_shape=(10,), # Testing data
-        activation="relu", # Activation function to use (of None, no default activation function is used)
-        auto_bias=True, # Whether to automatically add bias to the network
+        activation=None, # Activation function to use (of None, no default activation function is used)
+        auto_bias=False, # Whether to automatically add bias to the network
         separate_ints=True, # Whether to separate small integers from large integers in the stacks
         mute_instructions=['await_connection', 'back_connect', 'transpose'], # Instructions to mute
         embedding=None,
         embed_dim=None,
-        vocab_size=None,
         out_file="redo_cifar10_lexicase_vast_50pop_20gen_1epoch"
     )
     # pop.save("pop.pkl")

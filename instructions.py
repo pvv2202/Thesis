@@ -3,7 +3,6 @@ import torch.nn.functional as F
 from functools import partial
 import utils
 from dag import *
-from functions import *
 import inspect
 import torch.nn.init as init
 import torch.nn as nn
@@ -17,7 +16,7 @@ class Instructions:
     """Instructions for the Push Interpreter. Returns True if instruction was successful (added to dag),
     False otherwise"""
 
-    def __init__(self, activation='relu'):
+    def __init__(self, activation=None):
         """Initialize Instructions. If activation is None, all instructions are available. Otherwise, we exclude
         activation functions"""
         if activation is not None:

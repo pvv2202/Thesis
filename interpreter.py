@@ -1,8 +1,8 @@
 import utils
 import gp
+import torch
 from instructions import Instructions
 from dag import *
-from functions import *
 from network import Network
 import torch.nn.init as init
 import torch.nn as nn
@@ -18,8 +18,8 @@ class Interpreter:
     Push Interpreter. By default, automatically adds relu and bias where applicable and
     separates small vs. large integers
     """
-    def __init__(self, input_shape, output_shape, activation='relu', auto_bias=True, separate_ints=True,
-                 embedding=None, embed_dim=None, vocab_size=None, recurrent=False):
+    def __init__(self, input_shape, output_shape, instructions, activation=None, auto_bias=False, separate_ints=True,
+                 embedding=None, embed_dim=None, recurrent=False):
         self.stacks = {
             'int': [], # Really just Natural numbers
             'sint': [], # Small integers
@@ -45,17 +45,15 @@ class Interpreter:
         self.auto_bias = auto_bias
         self.separate_ints = separate_ints
 
-        # TODO: Use premade embeddings so just remove all of this? Unsure
         # Embedding parameters
         self.embedding = embedding
         self.embed_dim = embed_dim
-        self.vocab_size = vocab_size
 
         # Recurrent parameters
         self.recurrent = recurrent
 
         # Initialize instructions
-        self.instructions = Instructions(activation=self.activation)
+        self.instructions = instructions
 
     def read_genome(self, genome):
         """Reads genome into exec stack"""
@@ -123,6 +121,7 @@ class Interpreter:
             root=root,
             recurrences=self.net['recurrences'],
             device=self.device,
+            recurrent=self.recurrent
         )
         return network
 
@@ -147,11 +146,10 @@ class Interpreter:
         last_node = self.net['nodes'].popleft()
         last_shape = last_node.shape
 
-        # TODO: use self.embedding as the fn (so some kind of embedding module)
         node = Node(
             shape=(last_shape[0], self.embed_dim),
             layer=1, # Since this will only ever come after the root
-            fn=embedding,
+            fn=self.embedding,
             desc="Embedding",
             flops=self.input_shape[0] * self.embed_dim,  # Approximate cost
         )
@@ -221,6 +219,6 @@ class Interpreter:
 
         # Prune all nodes that aren't in the path of the output layer. This is crucial. Forward pass can fail if we don't do this.
         # Due to different branches. There has to be only one final output when we conduct a forward pass
-        dag.prune(node)
+        dag.prune(node, self.net['recurrences'])
 
-        # TODO: Support for activation functions?
+        # TODO: Support for activation functions

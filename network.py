@@ -5,14 +5,13 @@ from tqdm import tqdm
 import heapq
 import math
 import pygame
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils import *
 
 class Network(nn.Module):
-    def __init__(self, dag, root, recurrences, device):
+    def __init__(self, dag, root, recurrences, device, recurrent):
         """Initialize network object"""
         super().__init__()
 
@@ -21,6 +20,7 @@ class Network(nn.Module):
         self.parents = dag.get_parents()
         self.device = device
         self.recurrences = recurrences
+        self.recurrent = recurrent
         self.flops = self.calculate_flops()
 
         # Get a linear order of nodes using topological sort
@@ -41,9 +41,9 @@ class Network(nn.Module):
 
         self.param_count = sum(p.numel() for p in self.parameters())
 
-    def forward(self, x, recurrent=False):
+    def forward(self, x):
         """Forward pass through the network"""
-        if not recurrent:
+        if not self.recurrent:
             # Store the output of each node. Initialize with root
             outputs = {self.root: self.node_modules[self.node_to_name[self.root]](x)}
 
@@ -57,16 +57,12 @@ class Network(nn.Module):
                 # Execute the function of the node
                 outputs[node] = self.node_modules[self.node_to_name[node]](*parent_tensors) # Execute the function on parent tensors
 
-            # Apply recurrences
-            for recurrent_node, source_node in self.recurrences.items():
-                outputs[recurrent_node] = outputs[source_node]
-
             return outputs[self.order[-1]]  # Return the output of the last node
-        else: # So if it is recurrent
+        else: # If recurrent
             outputs = []
             seq_length = x.size(1)
             for t in range(seq_length):
-                x_t = x[:, t:t+1] # Get input at t and preserve batch dim
+                x_t = x[:, t] # Get the input at this timestep
                 outputs.append({self.root: self.node_modules[self.node_to_name[self.root]](x_t)})
                 for node in self.order:
                     if node == self.root:
@@ -74,16 +70,17 @@ class Network(nn.Module):
 
                     parents = self.parents[node]
                     parent_tensors = [outputs[t][parent] for parent in parents]
-                    outputs[t][node] = self.node_modules[self.node_to_name[node]](*parent_tensors)
 
-                    # Apply recurrences
-                    for recurrent_node, source_node in self.recurrences.items():
-                        outputs[t][recurrent_node] = outputs[t][source_node]
+                    # Set the parent tensors to the output of the previous source node
+                    if node in self.recurrences and t > 0:
+                        parent_tensors = [outputs[t-1][self.recurrences[node]]]
+
+                    outputs[t][node] = self.node_modules[self.node_to_name[node]](*parent_tensors)
 
             return torch.stack([outputs[t][self.order[-1]] for t in range(seq_length)], dim=1) # Return the outputs at each timestep
 
     def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None,
-            downsample=None, recurrent=False, seq_length=5):
+            downsample=None, seq_length=5):
         """Fit the model"""
         optimizer = optimizer(self.parameters(), lr=learning_rate)
         self.to(self.device) # Move to GPU if applicable
@@ -101,13 +98,18 @@ class Network(nn.Module):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
 
-                if recurrent:
+                if self.recurrent:
                     # If recurrent, unroll through time (doing truncated BPTT so steps of seq_length)
                     for t in range(0, x.size(1), seq_length):
                         # Get the input and output for this time step but preserve batch dimension
                         x_t = x[:, t:t + seq_length]
                         y_t = y[:, t:t + seq_length]
-                        y_pred = self.forward(x_t, recurrent=True)
+                        y_pred = self.forward(x_t)
+
+                        # For compatibility with cross entropy, flatten the predictions and targets
+                        y_pred = y_pred.view(-1, y_pred.size(-1)) # Flatten these into 2D w batch_size * seq_len, vocab_size
+                        y_t = y_t.reshape(-1) # Flatten these into 1D w batch_size * seq_len
+
                         loss = loss_fn(y_pred, y_t)
                         loss.backward()
                 else:
@@ -145,6 +147,10 @@ class Network(nn.Module):
 
                 # Forward pass
                 y_pred = self.forward(x)
+
+                # For compatibility with cross entropy, flatten the predictions and targets
+                y_pred = y_pred.view(-1, y_pred.size(-1))  # Flatten these into 2D w batch_size * seq_len, vocab_size
+                y = y.reshape(-1)  # Flatten these into 1D w batch_size * seq_len
 
                 # Compute loss
                 loss = loss_fn(y_pred, y)

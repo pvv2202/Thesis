@@ -4,7 +4,7 @@ import gp
 import string
 
 class TextDataset(Dataset):
-    def __init__(self, file_path, seq_length=10):
+    def __init__(self, file_path, seq_length):
         with open(file_path, "r", encoding="utf-8") as file:
             self.text = file.read().lower()
 
@@ -26,7 +26,7 @@ class TextDataset(Dataset):
         return input_seq, target_seq
 
 # Load dataset
-full_dataset = TextDataset("data/alice.txt", seq_length=20)
+full_dataset = TextDataset(file_path="data/alice.txt", seq_length=20)
 
 # Split into train (80%) and test (20%)
 train_size = int(0.8 * len(full_dataset))
@@ -38,85 +38,37 @@ train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=
 test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True)
 
 '''Individual Tests'''
-# interpreter = Interpreter(train=train_loader, test=test_loader, activation="relu", auto_bias=True, embedding=True, embed_dim=128, vocab_size=70)
-# instructions = Instructions(activation="relu")
-# genome = gp.Genome(train=train_loader, test=test_loader, interpreter=interpreter, instructions=instructions)
+# instructions = gp.Instructions(activation=None)
+# interpreter = gp.Interpreter(input_shape=(1,), output_shape=(128,), instructions=instructions, activation=None, auto_bias=False, embedding=torch.nn.Embedding(num_embeddings=70, embedding_dim=128), embed_dim=128, recurrent=True)
+# genome = gp.Genome(interpreter=interpreter, instructions=instructions)
 # genome.genome = [
-#     'matmul', 'matmul','matmul','matmul','matmul','matmul','matmul','matmul','matmul','matmul', 125, 250, 500, 1000, 500, 250, 125, 64
+#     'await_connection', '(', 3, 'maxpool2d', '(', 'matmul_nodes', '(', '(', 'mat_add', 'dup', 'avgpool2d',
+#      'mat_add_nodes', 'maxpool2d', 'identity', 5, 'for_n', 'back_connect', 'matmul', '(', 'conv2d', '(', 'mat_add', '(',
+#      128, '(', 'back_connect', 'matmul', 3, 'back_connect', '(', 5, 3, 'identity', '(', 'conv2d', 'mat_add_nodes', '(',
+#      16, 'await_connection', 16
 #     # 'mat_add', 'mat_add', 4, 16, 'mat_add_nodes', 'mat_add', 3, 256, 5, 2, 128, 5, 'mat_add_nodes', 32, 'matmul_nodes',
 #     #  4, 32, 'mat_add', 'mat_add_nodes', 'maxpool2d', 'maxpool2d', 4, 8, 5, 'maxpool2d'
 # ]
 # network = genome.transcribe()
 # print(network)
-# network.fit(epochs=5)
-# fitness = network.evaluate()
+# network.fit(epochs=5, train=train_loader)
+# fitness = network.evaluate(test=test_loader)
 # print(f"Genome fitness: {fitness}")
-#
-# # Model Inference
-# text = "Alice went to wonderland and saw a"
-# for _ in range(100):
-#     input_seq = torch.tensor([full_dataset.char2idx[ch] for ch in text[-20:]], dtype=torch.long).unsqueeze(0)
-#     pred = network.forward(input_seq)
-#     pred_last = pred[:, -1, :]
-#     probs = F.softmax(pred_last, dim=-1)
-#     probs = probs.squeeze(0)
-#     next_char_id = torch.multinomial(probs, num_samples=1).item()
-#     next_char = full_dataset.idx2char[next_char_id]
-#     text += next_char
-#
-# print(text)
 
-# # pop = gp.Population.load("pop.pkl")
-# pop = gp.Population(
-#     size=250, # Population size (number of individuals)
-#     num_initial_genes=20, # Number of genes to start with for each individual
-#     input_shape=(3, 32, 32), # Training data
-#     output_shape=(10,), # Testing data
-#     activation="relu", # Activation function to use (of None, no default activation function is used)
-#     auto_bias=True, # Whether to automatically add bias to the network
-#     separate_ints=True, # Whether to separate small integers from large integers in the stacks
-#     mute_instructions=['await_connection', 'back_connect', 'transpose'], # Instructions to mute
-#     embedding=False,
-#     embed_dim=None,
-#     vocab_size=None,
-# )
-# # pop.save("pop.pkl")
-# pop.run(
-#     train=train_loader, # Training data
-#     test=val_loader, # Validation data
-#     generations=10, # Number of generations to run this population for
-#     epochs=1, # Number of epochs to train each network for
-#     loss_fn=torch.nn.CrossEntropyLoss(), # Loss function
-#     optimizer=torch.optim.Adam,
-#     method='epsilon_lexicase', # Selection method
-#     pool_size=15, # Number of individuals to select from the population for each selection into the next generation
-#     param_limit=50000000, # Maximum number of parameters allowed in a network
-#     flops_limit=100000000, # Maximum number of FLOPs allowed in a network
-#     increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
-#     downsample=0.1 # Choose whether to downsample and by how much
-# )
-#
-# for genome in pop.population:
-#     print(genome.fitness)
-#     print(genome.genome)
-#     print("")
-
-# TODO: Add emebedding to this
 
 '''Population Tests'''
 # pop = Population.load("pop.pkl")
 pop = gp.Population(
     size=50, # Population size (number of individuals)
-    num_initial_genes=50, # Number of genes to start with for each individual
-    input_shape=(20,), # Input shape
-    output_shape=(20,128), # Output shape
+    num_initial_genes=(5, 100), # Number of genes to start with for each individual
+    input_shape=(1,), # Input shape
+    output_shape=(128,), # Output shape
     activation="relu", # Activation function to use (of None, no default activation function is used)
     auto_bias=True, # Whether to automatically add bias to the network
     separate_ints=True, # Whether to separate small integers from large integers in the stacks
-    mute_instructions=['flatten', 'transpose'], # Instructions to mute
-    embedding=True,
+    mute_instructions=['flatten', 'transpose', 'layer_norm', 'batch_norm'], # Instructions to mute
+    embedding=torch.nn.Embedding(num_embeddings=70, embedding_dim=128),
     embed_dim=128,
-    vocab_size=70,
     recurrent=True
 )
 # pop.save("pop.pkl")
