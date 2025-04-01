@@ -297,14 +297,14 @@ class Population:
 
                 # Update best genomes. Include counter to break ties
                 if len(best_genomes_acc) < 100:
-                    heapq.heappush(best_genomes_acc, (accuracy, counter, copy.deepcopy(genome)))
+                    heapq.heappush(best_genomes_acc, (accuracy, counter, copy.deepcopy(genome.genome)))
                 else:
-                    heapq.heappushpop(best_genomes_acc, (accuracy, counter, copy.deepcopy(genome)))
+                    heapq.heappushpop(best_genomes_acc, (accuracy, counter, copy.deepcopy(genome.genome)))
 
                 if len(best_genomes_loss) < 100:
-                    heapq.heappush(best_genomes_loss, (-loss, counter, copy.deepcopy(genome)))
+                    heapq.heappush(best_genomes_loss, (-loss, counter, copy.deepcopy(genome.genome)))
                 else:
-                    heapq.heappushpop(best_genomes_loss, (-loss, counter, copy.deepcopy(genome)))
+                    heapq.heappushpop(best_genomes_loss, (-loss, counter, copy.deepcopy(genome.genome)))
 
                 counter += 1
 
@@ -345,12 +345,12 @@ class Population:
         print("BEST BY ACCURACY")
         for genome in best_genomes_acc:
             print(genome[0])
-            print(genome[2].genome)
+            print(genome[2])
 
         print("BEST BY LOSS")
         for genome in best_genomes_loss:
             print(-genome[0])
-            print(genome[2].genome)
+            print(genome[2])
 
         # Generate labels for each generation
         labels = [i for i in range(1, generations + 1)]
