@@ -43,6 +43,7 @@ class DAG:
     def prune(self, node, recurrences):
         """Prune all node that are not in the path from the root to node"""
         visited = set()
+        recurrences = set(recurrences.values()) # Very minor speedup
         max_heap = []
         counter = 0 # To break ties when layers are equal
 
@@ -62,10 +63,10 @@ class DAG:
                             counter += 1
 
         for u in list(self.graph.keys()):
-            if u not in visited:  # If node isn't in the path from root to node, remove it
+            if u not in visited and u not in recurrences:  # If node isn't in the path from root to node, remove it
                 del self.graph[u]
             else:  # Otherwise, remove any edges to nodes that are not in the path
-                self.graph[u] = [v for v in self.graph[u] if v in visited]
+                self.graph[u] = [v for v in self.graph[u] if v in visited or v in recurrences]
 
     def __str__(self):
         """String representation of the DAG"""

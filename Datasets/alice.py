@@ -84,7 +84,6 @@ pop.run(
     param_limit=50000000, # Maximum number of parameters allowed in a network
     flops_limit=5000000000, # Maximum number of FLOPs allowed in a network
     increase_epochs=False, # Whether to increase the number of epochs (can also be a fraction of epochs) trained based on the generation
-    downsample=0.1 # Choose whether to downsample and by how much
 )
 
 for genome in pop.population:

@@ -245,7 +245,7 @@ class Population:
             genome.umad(gen_num, count=0)
 
     def run(self, train, test, generations, epochs, loss_fn, optimizer=torch.optim.Adam, method='tournament',
-            pool_size=5, param_limit=1000000, flops_limit=50000000, increase_epochs=False, downsample=False):
+            pool_size=5, param_limit=1000000, flops_limit=50000000, increase_epochs=False):
         """Runs the population on the train and test data"""
         start = time.time()
         acc = []
@@ -288,7 +288,7 @@ class Population:
                     generation = None
 
                 # Train the network
-                network.fit(train=train, epochs=epochs, loss_fn=loss_fn, optimizer=optimizer, generation=generation, downsample=downsample)
+                network.fit(train=train, epochs=epochs, loss_fn=loss_fn, optimizer=optimizer, generation=generation)
                 loss, accuracy, results = network.evaluate(test=test, loss_fn=loss_fn)
                 param_max = max(param_max, network.param_count)
                 flops_max = max(flops_max, network.flops)

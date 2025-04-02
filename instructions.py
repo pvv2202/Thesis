@@ -448,6 +448,7 @@ class Instructions:
         # Add awaiting, node to recurrence dictionary
         awaiting = net['awaiting_nodes'].popleft()
         net['recurrences'][awaiting] = net['nodes'][0]
+        net['nodes'][0].desc = net['nodes'][0].desc + " (Recurrent)"
 
         return True
 

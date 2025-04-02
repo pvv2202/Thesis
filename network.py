@@ -71,7 +71,7 @@ class Network(nn.Module):
                     parents = self.parents[node]
                     parent_tensors = [outputs[t][parent] for parent in parents]
 
-                    # Set the parent tensors to the output of the previous source node
+                    # Set the parent tensors to the output of the previous source node to set its value to the previous output.
                     if node in self.recurrences and t > 0:
                         parent_tensors = [outputs[t-1][self.recurrences[node]]]
 
@@ -79,8 +79,7 @@ class Network(nn.Module):
 
             return torch.stack([outputs[t][self.order[-1]] for t in range(seq_length)], dim=1) # Return the outputs at each timestep
 
-    def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None,
-            downsample=None, seq_length=5):
+    def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None, seq_length=20):
         """Fit the model"""
         optimizer = optimizer(self.parameters(), lr=learning_rate)
         self.to(self.device) # Move to GPU if applicable
@@ -90,7 +89,7 @@ class Network(nn.Module):
         if generation:
             train_fraction = epochs*generation # Get fraction of data we want to train with
 
-        for epoch in range(epochs):
+        for epoch in range(int(math.ceil(epochs))):
             # Progress bar
             progress_bar = tqdm(train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch")
 
@@ -121,8 +120,8 @@ class Network(nn.Module):
 
                 progress_bar.set_postfix({"loss": float(loss.item())})
 
-                if downsample is not None and (i + 1) / len(train) >= downsample:
-                    # If we're only partially training each epoch, return early
+                if epoch == int(math.floor(epochs)) and int(math.floor(epochs)) + (i + 1) / len(train) >= epochs:
+                    # If we're only partially training on epochs, return early
                     return
 
                 # Iteratively increase the amount we train
@@ -187,216 +186,7 @@ class Network(nn.Module):
     def __str__(self):
         return self.dag.__str__() + '\n' + f"Parameters: {self.param_count}" + '\n' + f"FLOPs: {self.flops}"
 
-# class Network:
-#     def __init__(self, dag, params, device, recurrences=None):
-#         """Initialize network object"""
-#         self.dag = dag
-#         self.params = params
-#         self.device = device
-#         self.param_count = sum(p.numel() for p in self.params) # Number of elements across all parameter arrays
-#         self.flops = self.calculate_flops()
-#         self.recurrences = recurrences
-#
-#     def calculate_flops(self):
-#         """Calculate and return flops"""
-#         flops = 0
-#
-#         # BFS
-#         queue = deque()
-#         queue.extend(self.dag.graph[self.dag.root])
-#         while queue:
-#             node = queue.popleft()
-#             flops += node.flops
-#             queue.extend(self.dag.graph[node]) # Add children to queue
-#
-#         return flops
-#
-#     @profile
-#     def forward(self, x):
-#         """Forward pass through the graph"""
-#         # Load tensor into the root node
-#         self.dag.root.tensor = x
-#         out = self.dag.root
-#
-#         # Min heap (by layer) for the children of the root
-#         heap = []
-#         count = 0  # Tie-breaker counter. Otherwise we get an error trying to compare nodes
-#         for child in self.dag.graph[self.dag.root]:
-#             # Push a tuple of (layer, counter, node) into the heap
-#             heapq.heappush(heap, (child.layer, count, child))
-#             count += 1
-#
-#         # Pop nodes in order of increasing layer
-#         while heap:
-#             _, _, node = heapq.heappop(heap)
-#             for child in self.dag.graph[node]:
-#                 heapq.heappush(heap, (child.layer, count, child))
-#                 count += 1
-#
-#             # Execute node
-#             node.execute(self.params, self.device)
-#             out = node
-#
-#         return out.tensor  # Output is always the last processed node
-#
-#     def loss(self, y_pred, y, loss_fn=torch.nn.functional.cross_entropy):
-#         """Calculate Loss"""
-#         if y_pred is None:
-#             print("Invalid network")
-#             print(self.dag)
-#             return float('-inf')
-#
-#         # Flatten for cross entropy
-#         # (batch_size * seq_len, vocab_size) vs. (batch_size * seq_len)
-#         # y_pred_flat = y_pred.view(-1, y_pred.size(-1))  # (N, C)
-#         # y_flat = y.view(-1)  # (N,)
-#
-#         return loss_fn(y_pred, y)
-#
-#     def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=torch.nn.functional.cross_entropy, optimizer=torch.optim.Adam, generation=None, downsample=None):
-#         """Fit the model"""
-#         optimizer = optimizer(self.params, lr=learning_rate)
-#         train_fraction = 1
-#         if generation:
-#             train_fraction = epochs*generation # Get fraction of data we want to train with
-#
-#         for epoch in range(epochs):
-#             # Iterate over the training data, use tqdm to show a progress bar
-#             progress_bar = tqdm(train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch", colour="green")
-#
-#             # Update hidden node if recurrent
-#             if self.recurrences:
-#                 x, y = next(iter(train))
-#                 batch_dim = x.shape[0]
-#                 for awaiting, back in self.recurrences.items():
-#                     awaiting.tensor = torch.tensor((batch_dim, *back.shape))  # Set awaiting's tensor to be the same as back's tensor
-#
-#             for i, (x, y) in enumerate(progress_bar):
-#                 x, y = x.to(self.device), y.to(self.device)
-#                 optimizer.zero_grad()
-#
-#                 # Update awaiting tensors with previous values
-#                 if self.recurrences:
-#                     for awaiting, back in self.recurrences.items():
-#                         awaiting.tensor = back.tensor  # Set awaiting's tensor to be the same as back's tensor
-#
-#                 y_pred = self.forward(x)
-#
-#                 # Forward pass and compute loss
-#                 l = self.loss(y_pred, y, loss_fn)
-#
-#                 # Backpropagation
-#                 l.backward()
-#
-#                 # Update parameters
-#                 optimizer.step()
-#
-#                 if downsample is not None and (i + 1) / len(train) >= downsample:
-#                     return None
-#
-#                 # Iteratively increase the amount we train
-#                 if generation:
-#                     fraction_done = (i + 1) / len(train)
-#                     if fraction_done >= train_fraction:
-#                         return None
-#
-#         return None
-#
-#     def evaluate(self, test, loss_fn=torch.nn.functional.cross_entropy):
-#         """Evaluate the model on the test set. Returns loss, accuracy, results tuple"""
-#         if test == None:
-#             print("No testing data provided")
-#             return
-#
-#         correct_predictions = 0
-#         total_loss = 0
-#         test_sum = 0
-#
-#         results = []
-#
-#         # Update hidden node if recurrent
-#         if self.recurrences:
-#             x, y = next(iter(test))
-#             batch_dim = x.shape[0]
-#             for awaiting, back in self.recurrences.items():
-#                 awaiting.tensor = torch.tensor((batch_dim, *back.shape))  # Set awaiting's tensor to be the same as back's tensor
-#
-#         for x, y in test:
-#             x, y = x.to(self.device), y.to(self.device)
-#             # Forward pass and compute
-#             with torch.no_grad():
-#                 # Update awaiting tensors with previous values
-#                 if self.recurrences:
-#                     for awaiting, back in self.recurrences.items():
-#                         awaiting.tensor = back.tensor  # Set awaiting's tensor to be the same as back's tensor
-#
-#                 y_pred = self.forward(x)
-#
-#                 # print("Prediction:")
-#                 # print(torch.max(y_pred, -1))
-#                 # print("Actual:")
-#                 # print(y)
-#
-#                 l = self.loss(y_pred, y, loss_fn)
-#                 # If invalid, just return inf, -inf
-#                 if type(l) == float:
-#                     return float('inf'), float('-inf')
-#                 total_loss += l.item()
-#
-#                 test_sum += y.numel() # Number of elements in y
-#
-#                 # Calculate accuracy
-#                 _, predictions = torch.max(y_pred, -1) # Should always be last dimension (hence -1). Max, indices is the form
-#
-#                 correct_predictions += (predictions == y).sum().item()
-#                 results.append((total_loss, correct_predictions / len(y))) # Store the total loss and accuracy for each batch
-#
-#             # if i/len(self.test) >= 0.25:
-#             #     break
-#
-#         # Calculate accuracy
-#         accuracy = correct_predictions / test_sum
-#         print(f'Test set: Loss: {total_loss / len(test)}, Accuracy: {accuracy * 100:.2f}%')
-#
-#         return total_loss, accuracy, results
-#
-#     #####################
-#     ### Visualization ###
-#     #####################
-#
-#     def get_height_width(self):
-#         """Conducts a single forward pass of the graph and outputs a tuple (height, width)"""
-#         height, width = 0, 0
-#
-#         # Min heap (by layer) for the children of the root
-#         heap = []
-#         count = 0  # Tie-breaker counter. Otherwise, we get an error trying to compare nodes
-#         for child in self.dag.graph[self.dag.root]:
-#             # Push a tuple of (layer, counter, node) into the heap
-#             heapq.heappush(heap, (child.layer, count, child))
-#             count += 1
-#
-#         # Pop nodes in order of increasing layer
-#         curr_layer_count = 0 # Number of nodes on this layer
-#         prev_layer = 0
-#         while heap:
-#             _, _, node = heapq.heappop(heap)
-#
-#             if node.layer == prev_layer:
-#                 curr_layer_count += 1
-#             else:
-#                 curr_layer_count = 1
-#                 prev_layer = node.layer
-#                 height = node.layer
-#
-#             width = max(width, curr_layer_count)
-#
-#             for child in self.dag.graph[node]:
-#                 heapq.heappush(heap, (child.layer, count, child))
-#                 count += 1
-#
-#         return height, width
-#
+
 #     def visualize(self):
 #         '''Visualize the network with camera movement using arrow keys or WASD.'''
 #         pygame.init()
