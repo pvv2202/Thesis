@@ -30,23 +30,24 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     '''Individual Tests'''
-    # instructions = gp.Instructions(activation=None)
-    # interpreter = gp.Interpreter(input_shape=(3,32,32), output_shape=(10,), instructions = instructions, activation=None, auto_bias=False)
-    # genome = gp.Genome(interpreter=interpreter, instructions=instructions)
-    # genome.genome = [
-    #     'avgpool2d', 32, 'identity', 'avgpool2d', 256, 'batch_norm', 'mat_add_nodes', 3, 2, 4, 'maxpool2d', 32, 4,
-    #      'mat_add', 32, 'layer_norm', 'conv2d', 'matmul_nodes', 'conv2d', 'layer_norm', 'mat_add_nodes', '(', 256,
-    #      'matmul', '(', 3, 'conv2d', 'maxpool2d', 'batch_norm', 'maxpool2d', 'conv2d', 'matmul_nodes', 4, 'batch_norm',
-    #      'conv2d', 256, 'identity', 128, 2, 32, 128
-    #     # 1, 'conv2d', 5, 2, 2, 'dup', 'matmul', 5, 3, 'maxpool2d', 128, 3, 256, 'maxpool2d', 'matmul_nodes', 'matmul_nodes', 32, 'matmul_nodes', 'mat_add_nodes', 'matmul_nodes', 'conv2d', 'mat_add', 'conv2d'
-    #     # 3, 3, 'mat_add', 8, 'matmul', 2, 128, 'conv2d', 'dup', 'avgpool2d', 'maxpool2d', 16, 'maxpool2d', 'conv2d', 4, 2, 16, 256, 'mat_add', 64
-    #     # 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'matmul', 'flatten', 'maxpool2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'conv2d', 'maxpool2d', 'conv2d',
-    #     # 32, 64, 128, 256, 512, 1024, 512, 512, 256, 256, 128, 128, 64, 64, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
-    # ]
-    # network = genome.transcribe()
-    # print(network)
-    # network.fit(epochs=1, train=train_loader)
-    # fitness = network.evaluate(test=test_loader)
+    instructions = gp.Instructions(activation=None)
+    interpreter = gp.Interpreter(input_shape=(3,32,32), output_shape=(10,), instructions = instructions, activation=None, auto_bias=False)
+    genome = gp.Genome(interpreter=interpreter, instructions=instructions)
+    genome.genome = [
+        # 1, 'mat_add', 'avgpool2d', 32, 32, '(', 'matmul_nodes', 'matmul_nodes', 'identity', 'layer_norm', 3,
+        #  'matmul_nodes', 'maxpool2d', 32, 1, 32, '(', '(', 16, 'mat_add_nodes', 4, 'matmul', 'conv2d', 'layer_norm',
+        #  'conv2d', 'layer_norm', 'matmul', '(', 128, 'maxpool2d', '(', 128, 128, 'batch_norm', 128, 'tanh', 256, '(',
+        #  'layer_norm', 1, '(', '(', 1, '(', 128, 4, '(', '(', 'matmul_nodes', 16, '(', '(', '(', 'maxpool2d', 128, 'conv2d',
+        #  128, 2, 1, 256
+        16, 'layer_norm', 'mat_add', 256, 'mat_add', 64, 'avgpool2d', '(', 'layer_norm', 'maxpool2d', 32, 'relu', 32,
+         64, 256, 'layer_norm', 'matmul', 'conv2d', 'conv2d', 'matmul', 'maxpool2d', '(', 'identity', 'identity', '(',
+         128, 128, 'batch_norm', '(', 1, 'layer_norm', 256, 64, 'identity', 1, '(', 4, '(', 'tanh', '(', 'sigmoid',
+         'matmul_nodes', 16, 64, '(', 'relu', 'maxpool2d', 'conv2d', 2, 64, 'matmul_nodes', 256
+    ]
+    network = genome.transcribe()
+    print(network)
+    network.fit(epochs=1, train=train_loader)
+    fitness = network.evaluate(test=test_loader)
 
     '''Population Example'''
     # pop = gp.Population.load("pop.pkl")

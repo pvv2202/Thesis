@@ -56,6 +56,23 @@ class DAG:
             _, _, current = heapq.heappop(max_heap)  # Extract node with the highest layer (breaking ties by counter)
             if current not in visited:
                 visited.add(current)
+                if current in recurrences:
+                    visited.add(current)
+                    del recurrences[current]  # Remove from recurrences if we find it in the path
+                if current in parents and len(parents[current]) > 0: # If current node has parents
+                    for parent in parents[current]:
+                        if parent not in visited:
+                            heapq.heappush(max_heap, (-parent.layer, counter, parent))  # Tie-breaking with counter
+                            counter += 1
+
+        # Reverse BFS from all recurrent nodes remaining (weren't seen in original BFS)
+        for recurrent in recurrences:
+            max_heap = []
+            counter = 0  # To break ties when layers are equal
+            heapq.heappush(max_heap, (-recurrent.layer, counter, recurrent))
+            _, _, current = heapq.heappop(max_heap)  # Extract node with the highest layer (breaking ties by counter)
+            if current not in visited:
+                visited.add(current)
                 if current in parents and len(parents[current]) > 0: # If current node has parents
                     for parent in parents[current]:
                         if parent not in visited:
@@ -63,10 +80,10 @@ class DAG:
                             counter += 1
 
         for u in list(self.graph.keys()):
-            if u not in visited and u not in recurrences:  # If node isn't in the path from root to node, remove it
+            if u not in visited:  # If node isn't in the path from root to node, remove it
                 del self.graph[u]
             else:  # Otherwise, remove any edges to nodes that are not in the path
-                self.graph[u] = [v for v in self.graph[u] if v in visited or v in recurrences]
+                self.graph[u] = [v for v in self.graph[u] if v in visited]
 
     def __str__(self):
         """String representation of the DAG"""

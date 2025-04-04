@@ -156,10 +156,11 @@ class Network(nn.Module):
                 total_loss += loss.item()
 
                 _, predictions = torch.max(y_pred, dim=-1)
-                correct_predictions += (predictions == y).sum().item()
+                batch_predictions = (predictions == y).sum().item()
+                correct_predictions += batch_predictions
                 # Compute accuracy
                 # Store the total loss and accuracy for each batch. Need this for Lexicase Selection
-                results.append((total_loss, correct_predictions / len(y)))
+                results.append((loss.item(), batch_predictions / y.numel()))
                 total_examples += y.numel()
 
         # Average loss and accuracy

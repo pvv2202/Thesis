@@ -162,7 +162,7 @@ class Population:
         else:
             return max(tournament, key=lambda x: x.fitness[0]) # By accuracy
 
-    def epsilon_lexicase(self, candidates, test, metric_index=0, minimize=False):
+    def epsilon_lexicase(self, candidates, test, metric_index=1, minimize=False):
         """Selects the best genome using epsilon-lexicase selection"""
         test_order = [i for i in range(len(test))] # Indices. Test batches aren't shuffled so indices work
         random.shuffle(test_order)
@@ -329,10 +329,11 @@ class Population:
             l.append(gen_loss)
             size.append(gen_size)
 
+            # TODO: Do this for loss and size as well
             # Save accuracy procedurally for graphing
             if self.out_file is not None:
                 acc_csv = np.array(acc)
-                np.savetxt(self.out_file, acc_csv, delimiter=",")
+                np.savetxt(self.out_file.csv, acc_csv, delimiter=",")
 
             print("\n--------------------------------------------------")
             print(f"Generation {gen_num} Completed")
