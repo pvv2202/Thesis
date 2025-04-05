@@ -49,7 +49,6 @@ class DAG:
 
         heapq.heappush(max_heap, (-node.layer, counter, node))
         parents = self.get_parents()
-        counter += 1
 
         # Max-Heap BFS from node to root so we explore by layer. Otherwise, we can have loop infinitely.
         while max_heap:
@@ -57,8 +56,7 @@ class DAG:
             if current not in visited:
                 visited.add(current)
                 if current in recurrences:
-                    visited.add(current)
-                    del recurrences[current]  # Remove from recurrences if we find it in the path
+                    recurrences.remove(current)  # Remove from recurrences if we find it in the path
                 if current in parents and len(parents[current]) > 0: # If current node has parents
                     for parent in parents[current]:
                         if parent not in visited:
@@ -70,14 +68,15 @@ class DAG:
             max_heap = []
             counter = 0  # To break ties when layers are equal
             heapq.heappush(max_heap, (-recurrent.layer, counter, recurrent))
-            _, _, current = heapq.heappop(max_heap)  # Extract node with the highest layer (breaking ties by counter)
-            if current not in visited:
-                visited.add(current)
-                if current in parents and len(parents[current]) > 0: # If current node has parents
-                    for parent in parents[current]:
-                        if parent not in visited:
-                            heapq.heappush(max_heap, (-parent.layer, counter, parent))  # Tie-breaking with counter
-                            counter += 1
+            while max_heap:
+                _, _, current = heapq.heappop(max_heap)
+                if current not in visited:
+                    visited.add(current)
+                    if current in parents and parents[current]:
+                        for parent in parents[current]:
+                            if parent not in visited:
+                                heapq.heappush(max_heap, (-parent.layer, counter, parent))
+                                counter += 1
 
         for u in list(self.graph.keys()):
             if u not in visited:  # If node isn't in the path from root to node, remove it

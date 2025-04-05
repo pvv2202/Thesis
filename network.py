@@ -68,6 +68,9 @@ class Network(nn.Module):
                     if node == self.root:
                         continue
 
+                    if node not in self.parents:
+                        print(node.shape)
+                        print(node.desc)
                     parents = self.parents[node]
                     parent_tensors = [outputs[t][parent] for parent in parents]
 

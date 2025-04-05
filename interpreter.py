@@ -147,7 +147,7 @@ class Interpreter:
         last_shape = last_node.shape
 
         node = Node(
-            shape=(last_shape[0], self.embed_dim),
+            shape=(self.embed_dim,),
             layer=1, # Since this will only ever come after the root
             fn=self.embedding,
             desc="Embedding",

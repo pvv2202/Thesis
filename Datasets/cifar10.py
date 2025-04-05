@@ -8,7 +8,7 @@ if __name__ == "__main__":
     # Define the transformation to apply to each image (convert to tensor and normalize)
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))  # Normalize grayscale images
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
     # Find device
