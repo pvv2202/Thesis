@@ -164,8 +164,8 @@ class Interpreter:
         last_shape = last_node.shape
         last_dim, output_dim = len(last_shape), len(self.output_shape)
 
+        # TODO: Fix output logic
         if last_dim < output_dim:
-            # TODO: Fix this
             # If last_dim < output_dim, we need project it up to the output dim.
             for _ in range(output_dim - last_dim):
                 # Add a node that unsqueezes the last dimension to the dag.
@@ -184,13 +184,44 @@ class Interpreter:
             for x in last_shape:
                 prod *= x
 
-            flatten_layer = nn.Flatten()
+            flatten_layer = nn.Flatten(start_dim=1)
 
             node = Node(
                 shape=(prod,),
                 layer=last_node.layer + 1,
                 fn=flatten_layer,
                 desc="Flatten",
+                flops=0
+            )
+            dag.add_edge(last_node, node)
+            last_node = node
+
+        # Check if any of the dimensions besides the last don't match the output
+        if any(x != y for x, y in zip(last_shape[:-1], self.output_shape[:-1])):
+            # If they don't, we need to flatten and then reshape
+            prod = 1
+            for x in last_shape:
+                prod *= x
+
+            flatten_layer = nn.Flatten(start_dim=1)
+
+            node = Node(
+                shape=(prod,),
+                layer=last_node.layer + 1,
+                fn=flatten_layer,
+                desc="Flatten",
+                flops=0
+            )
+            dag.add_edge(last_node, node)
+            last_node = node
+
+            # Reshape to the output shape
+            reshape_layer = nn.Unflatten(1, self.output_shape[1:])
+            node = Node(
+                shape=self.output_shape,
+                layer=last_node.layer + 1,
+                fn=reshape_layer,
+                desc="Reshape",
                 flops=0
             )
             dag.add_edge(last_node, node)
@@ -217,6 +248,5 @@ class Interpreter:
 
         dag.add_edge(last_node, node)
 
-        # Prune all nodes that aren't in the path of the output layer. This is crucial. Forward pass can fail if we don't do this.
-        # Due to different branches. There has to be only one final output when we conduct a forward pass
+        # Prune all nodes that aren't in the path of the output layer or a recurrent node
         dag.prune(node, self.net['recurrences'])

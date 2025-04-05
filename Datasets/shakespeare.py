@@ -79,7 +79,7 @@ print(f"Genome fitness: {fitness}")
 #     activation=None, # Activation function to use (of None, no default activation function is used)
 #     auto_bias=False, # Whether to automatically add bias to the network
 #     separate_ints=True, # Whether to separate small integers from large integers in the stacks
-#     mute_instructions=['flatten', 'transpose', 'layer_norm', 'batch_norm'], # Instructions to mute
+#     mute_instructions=[], # Instructions to mute
 #     embedding=torch.nn.Embedding(num_embeddings=len(dataset.vocab), embedding_dim=50),
 #     embed_dim=50,
 #     recurrent=True

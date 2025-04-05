@@ -525,22 +525,31 @@ class Instructions:
 
         return True
 
-    # @staticmethod
-    # def transpose(dag, net):
-    #     """Transpose the top node on the node queue"""
-    #     if len(net['nodes']) < 1:
-    #         return False
-    #
-    #     ref = net['nodes'].popleft()  # Pop node from stack
-    #     node = Node(
-    #         shape=ref.shape[::-1],  # Transpose matrix (reverse shapes. Batch not included here so it's fine)
-    #         layer=ref.layer + 1,
-    #         fn=transpose,
-    #         desc="Transpose",
-    #         flops=0
-    #     )
-    #     dag.add_edge(u=ref, v=node)
-    #     net['nodes'].append(node)
+    @staticmethod
+    def transpose(dag, net):
+        """Transpose the top node on the node queue"""
+        if len(net['nodes']) < 1:
+            return False
+
+        # Check if the top node's shape has 2 or more dimensions
+        if len(net['nodes'][0].shape) < 2:
+            return False
+
+        # TODO: Support transposing any dimensions (besides batch)?
+        # Currently transposes last 2 dimensions only
+        transpose_layer = Transpose()
+        new_shape = net['nodes'][0].shape[:-2] + (net['nodes'][0].shape[-1], net['nodes'][0].shape[-2])
+
+        ref = net['nodes'].popleft()  # Pop node from stack
+        node = Node(
+            shape=new_shape,  # Transpose matrix (reverse shapes. Batch not included here so it's fine)
+            layer=ref.layer + 1,
+            fn=transpose_layer,
+            desc="Transpose",
+            flops=0
+        )
+        dag.add_edge(u=ref, v=node)
+        net['nodes'].append(node)
 
     #########################
     ##### Normalization #####

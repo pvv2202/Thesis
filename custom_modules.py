@@ -17,3 +17,7 @@ class MatAddWeight(nn.Module):
 
     def forward(self, x):
         return x + self.weight
+
+class Transpose(nn.Module):
+    def forward(self, x):
+        return torch.transpose(x, -2, -1)

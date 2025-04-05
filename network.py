@@ -92,6 +92,8 @@ class Network(nn.Module):
         for epoch in range(int(math.ceil(epochs))):
             # Progress bar
             progress_bar = tqdm(train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch")
+            training_acc = 0
+            total_predictions = 0
 
             for i, (x, y) in enumerate(progress_bar):
                 x, y = x.to(self.device), y.to(self.device)
@@ -109,12 +111,22 @@ class Network(nn.Module):
                         y_pred = y_pred.view(-1, y_pred.size(-1)) # Flatten these into 2D w batch_size * seq_len, vocab_size
                         y_t = y_t.reshape(-1) # Flatten these into 1D w batch_size * seq_len
 
+                        # Add to accuracy
+                        _, predictions = torch.max(y_pred, dim=-1)
+                        training_acc += (predictions == y_t).sum().item()
+                        total_predictions += y_t.numel()
+
                         loss = loss_fn(y_pred, y_t)
                         loss.backward()
                 else:
                     y_pred = self.forward(x)
                     loss = loss_fn(y_pred, y)
                     loss.backward()
+
+                    # Add to accuracy
+                    _, predictions = torch.max(y_pred, dim=-1)
+                    training_acc += (predictions == y).sum().item()
+                    total_predictions += y.numel()
 
                 optimizer.step()
 
@@ -129,6 +141,8 @@ class Network(nn.Module):
                     fraction_done = (i + 1) / len(train)
                     if fraction_done >= train_fraction:
                         return
+
+            print(f"\rTraining Accuracy: {training_acc / total_predictions * 100:.2f}%")
 
     def evaluate(self, test, loss_fn=F.cross_entropy):
         """Evaluate the model on the test set. Returns average loss, accuracy, results tuple"""
