@@ -82,7 +82,7 @@ test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=T
 '''Population Tests'''
 # pop = Population.load("pop.pkl")
 pop = gp.Population(
-    size=75, # Population size (number of individuals)
+    size=50, # Population size (number of individuals)
     num_initial_genes=(5, 100), # Number of genes to start with for each individual
     input_shape=(1,), # Input shape
     output_shape=(len(dataset.vocab),), # Output shape
@@ -92,13 +92,14 @@ pop = gp.Population(
     mute_instructions=['batch_norm'], # Instructions to mute
     embedding=torch.nn.Embedding(num_embeddings=len(dataset.vocab), embedding_dim=50),
     embed_dim=50,
-    recurrent=True
+    recurrent=True,
+    out_file='shakespeare_loss_75_100'
 )
 # pop.save("pop.pkl")
 pop.run(
     train=train_loader,
     test=test_loader,
-    generations=100, # Number of generations to run this population for
+    generations=30, # Number of generations to run this population for
     epochs=1, # Number of epochs to train each network for
     loss_fn=torch.nn.CrossEntropyLoss(), # Loss function
     optimizer=torch.optim.Adam,
