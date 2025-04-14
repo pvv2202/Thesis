@@ -333,7 +333,7 @@ class Population:
             # Save accuracy procedurally for graphing
             if self.out_file is not None:
                 acc_csv = np.array(acc)
-                np.savetxt(self.out_file.csv, acc_csv, delimiter=",")
+                np.savetxt(self.out_file, acc_csv, delimiter=",")
 
             print("\n--------------------------------------------------")
             print(f"Generation {gen_num} Completed")

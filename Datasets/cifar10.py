@@ -11,12 +11,25 @@ if __name__ == "__main__":
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),  # Crop with padding
+        transforms.RandomHorizontalFlip(),  # Flip 50% of images
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),  # Optional
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+
     # Find device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load the Fashion CIFAR-10 training and test datasets
-    train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-    test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+    train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+    test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
 
     # Define dataset sizes (e.g., 80% training, 20% validation)
     train_size = int(0.8 * len(train_dataset))
@@ -40,19 +53,27 @@ if __name__ == "__main__":
         #  'layer_norm', 1, '(', '(', 1, '(', 128, 4, '(', '(', 'matmul_nodes', 16, '(', '(', '(', 'maxpool2d', 128, 'conv2d',
         #  128, 2, 1, 256
 
-        # 16, 'layer_norm', 'mat_add', 256, 'mat_add', 64, 'avgpool2d', '(', 'layer_norm', 'maxpool2d', 32, 'relu', 32,
-        #  64, 256, 'layer_norm', 'matmul', 'conv2d', 'conv2d', 'matmul', 'maxpool2d', '(', 'identity', 'identity', '(',
-        #  128, 128, 'batch_norm', '(', 1, 'layer_norm', 256, 64, 'identity', 1, '(', 4, '(', 'tanh', '(', 'sigmoid',
-        #  'matmul_nodes', 16, 64, '(', 'relu', 'maxpool2d', 'conv2d', 2, 64, 'matmul_nodes', 256
+        16, 'layer_norm', 'mat_add', 256, 'mat_add', 64, 'avgpool2d', '(', 'layer_norm', 'maxpool2d', 32, 'relu', 32,
+         64, 256, 'layer_norm', 'matmul', 'conv2d', 'conv2d', 'matmul', 'maxpool2d', '(', 'identity', 'identity', '(',
+         128, 128, 'batch_norm', '(', 1, 'layer_norm', 256, 64, 'identity', 1, '(', 4, '(', 'tanh', '(', 'sigmoid',
+         'matmul_nodes', 16, 64, '(', 'relu', 'maxpool2d', 'conv2d', 2, 64, 'matmul_nodes', 256
 
         # 16, 'layer_norm', '(', 'mat_add', 'mat_add', 64, 'avgpool2d', '(', 'matmul_nodes', 'layer_norm', 'maxpool2d',
         #  32, 32, 64, 256, 'layer_norm', 'matmul', 'conv2d', 'conv2d', 'matmul', 'maxpool2d', '(', 'identity',
         #  'identity', '(', 128, 128, 'batch_norm', '(', 1, '(', 'layer_norm', 256, 64, 1, '(', 4, '(', 'tanh', '(',
         #  'matmul_nodes', 16, 64, '(', 'relu', 'maxpool2d', 'for_n', 'conv2d', 2, 'matmul_nodes', 256
+
+        # 'relu', 4, 'batch_norm', 256, 16, 'maxpool2d', 'matmul_nodes', 'mat_add', 'maxpool2d', 4, 'mat_add', 'conv2d',
+        #  'tanh', 3, 'layer_norm', 'sigmoid', 'maxpool2d', '(', 'layer_norm', 'matmul_nodes', 'maxpool2d', 256, 'conv2d',
+        #  4, 'batch_norm', 256
+
+        # 'flatten', 'relu', 'matmul', 'for_n', 'relu', 'batch_norm', '(', 1, '(', '(', 32, 'maxpool2d', '(', 1,
+        #  'maxpool2d', 3, 'conv2d', '(', 'tanh', 3, 'layer_norm', 256, 'sigmoid', 'maxpool2d', '(', 'layer_norm',
+        #  'maxpool2d', 'conv2d', 4, 'mat_add_nodes', 'matmul_nodes', 256, '('
     ]
     network = genome.transcribe()
     print(network)
-    network.fit(epochs=2, train=train_loader)
+    network.fit(epochs=50, train=train_loader, test=test_loader)
     fitness = network.evaluate(test=test_loader)
 
     '''Population Example'''

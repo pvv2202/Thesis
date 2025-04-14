@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils import *
+import torch.optim as optim
 
 class Network(nn.Module):
     def __init__(self, dag, root, recurrences, device, recurrent):
@@ -97,6 +98,8 @@ class Network(nn.Module):
             progress_bar = tqdm(train, desc=f"Epoch {epoch + 1}/{epochs}", unit="batch")
             training_acc = 0
             total_predictions = 0
+
+            # self.evaluate(test)
 
             for i, (x, y) in enumerate(progress_bar):
                 x, y = x.to(self.device), y.to(self.device)

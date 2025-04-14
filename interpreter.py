@@ -164,7 +164,6 @@ class Interpreter:
         last_shape = last_node.shape
         last_dim, output_dim = len(last_shape), len(self.output_shape)
 
-        # TODO: Fix output logic
         if last_dim < output_dim:
             # If last_dim < output_dim, we need project it up to the output dim.
             for _ in range(output_dim - last_dim):
