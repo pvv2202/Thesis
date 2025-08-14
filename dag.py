@@ -50,7 +50,7 @@ class DAG:
         heapq.heappush(max_heap, (-node.layer, counter, node))
         parents = self.get_parents()
 
-        # Max-Heap BFS from node to root so we explore by layer. Otherwise, we can have loop infinitely.
+        # Max-Heap BFS from node to root so we explore by layer. Otherwise, we can loop infinitely.
         while max_heap:
             _, _, current = heapq.heappop(max_heap)  # Extract node with the highest layer (breaking ties by counter)
             if current not in visited:

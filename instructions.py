@@ -551,6 +551,8 @@ class Instructions:
         dag.add_edge(u=ref, v=node)
         net['nodes'].append(node)
 
+        return True
+
     #########################
     ##### Normalization #####
     #########################
@@ -581,6 +583,8 @@ class Instructions:
 
         net['nodes'].append(node)
 
+        return True
+
     @staticmethod
     def batch_norm(dag, net):
         """Batch Normalization"""
@@ -608,6 +612,8 @@ class Instructions:
         dag.add_edge(u=pop_node, v=node)
 
         net['nodes'].append(node)
+
+        return True
 
     #########################
     ###### PyTorch Ops ######
@@ -650,19 +656,19 @@ class Instructions:
     def relu(dag, net):
         """ReLU Activation Function"""
         relu_layer = nn.ReLU()
-        Instructions.process_torch_ops(dag, net, relu_layer, "ReLU")
+        return Instructions.process_torch_ops(dag, net, relu_layer, "ReLU")
 
     @staticmethod
     def sigmoid(dag, net):
         """Sigmoid Activation Function"""
         sigmoid_layer = nn.Sigmoid()
-        Instructions.process_torch_ops(dag, net, sigmoid_layer, "Sigmoid")
+        return Instructions.process_torch_ops(dag, net, sigmoid_layer, "Sigmoid")
 
     @staticmethod
     def tanh(dag, net):
         """Tanh Activation Function"""
         tanh_layer = nn.Tanh()
-        Instructions.process_torch_ops(dag, net, tanh_layer, "Tanh")
+        return Instructions.process_torch_ops(dag, net, tanh_layer, "Tanh")
 
     # @staticmethod
     # def softmax(dag, net):

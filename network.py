@@ -21,6 +21,7 @@ class Network(nn.Module):
         self.parents = dag.get_parents()
         self.device = device
         self.recurrences = recurrences
+        self.recur_srcs = set(self.recurrences.values())
         self.recurrent = recurrent
         self.flops = self.calculate_flops()
 
@@ -44,44 +45,59 @@ class Network(nn.Module):
 
     def forward(self, x):
         """Forward pass through the network"""
-        if not self.recurrent:
-            # Store the output of each node. Initialize with root
-            outputs = {self.root: self.node_modules[self.node_to_name[self.root]](x)}
+        # Store the output of each node. Initialize with root
+        outputs = {self.root: self.node_modules[self.node_to_name[self.root]](x)}
+
+        for node in self.order:
+            if node == self.root:
+                continue
+
+            parents = self.parents[node] # Get the parents of the node
+            parent_tensors = [outputs[parent] for parent in parents] # Get the output tensors of the parents
+
+            # Execute the function of the node
+            outputs[node] = self.node_modules[self.node_to_name[node]](*parent_tensors) # Execute the function on parent tensors
+
+        return outputs[self.order[-1]]  # Return the output of the last node
+
+    def recurrent_forward(self, x, state=None):
+        """Recurrent forward pass through the network"""
+        state = {} if state is None else state
+        outputs = []
+        next_state = {}
+        seq_length = x.size(1)
+
+        for t in range(seq_length):
+            x_t = x[:, t]
+            outputs.append({self.root: self.node_modules[self.node_to_name[self.root]](x_t)})
 
             for node in self.order:
                 if node == self.root:
                     continue
 
-                parents = self.parents[node] # Get the parents of the node
-                parent_tensors = [outputs[parent] for parent in parents] # Get the output tensors of the parents
+                parents = self.parents.get(node, [])
+                parent_tensors = [outputs[t][p] for p in parents]
 
-                # Execute the function of the node
-                outputs[node] = self.node_modules[self.node_to_name[node]](*parent_tensors) # Execute the function on parent tensors
+                if node in self.recurrences:
+                    src = self.recurrences[node]
+                    # Use carried state at t==0; otherwise use previous timestep
+                    if t == 0 and src in state:
+                        if src in state:
+                            parent_tensors = [state[src]] # Previous state's value (allows statefulness when chunking)
+                        else:
+                            parent_tensors = [torch.zeros(node.shape)] # Zeros (if first token in sequence)
+                    elif t > 0:
+                        parent_tensors = [outputs[t - 1][src]]
 
-            return outputs[self.order[-1]]  # Return the output of the last node
-        else: # If recurrent
-            outputs = []
-            seq_length = x.size(1)
-            for t in range(seq_length):
-                x_t = x[:, t] # Get the input at this timestep
-                outputs.append({self.root: self.node_modules[self.node_to_name[self.root]](x_t)})
-                for node in self.order:
-                    if node == self.root:
-                        continue
+                out = self.node_modules[self.node_to_name[node]](*parent_tensors)
+                outputs[t][node] = out
 
-                    if node not in self.parents:
-                        print(node.shape)
-                        print(node.desc)
-                    parents = self.parents[node]
-                    parent_tensors = [outputs[t][parent] for parent in parents]
+                # Remember the latest value of the recurrence source for the next chunk
+                if node in self.recur_srcs:
+                    next_state[node] = out
 
-                    # Set the parent tensors to the output of the previous source node to set its value to the previous output.
-                    if node in self.recurrences and t > 0:
-                        parent_tensors = [outputs[t-1][self.recurrences[node]]]
-
-                    outputs[t][node] = self.node_modules[self.node_to_name[node]](*parent_tensors)
-
-            return torch.stack([outputs[t][self.order[-1]] for t in range(seq_length)], dim=1) # Return the outputs at each timestep
+        y = torch.stack([outputs[t][self.order[-1]] for t in range(seq_length)], dim=1)
+        return y, next_state
 
     def fit(self, train, epochs=1, learning_rate=0.001, loss_fn=F.cross_entropy, optimizer=torch.optim.Adam, generation=None, seq_length=20):
         """Fit the model"""
@@ -107,11 +123,13 @@ class Network(nn.Module):
 
                 if self.recurrent:
                     # If recurrent, unroll through time (doing truncated BPTT so steps of seq_length)
+                    state = None
                     for t in range(0, x.size(1), seq_length):
                         # Get the input and output for this time step but preserve batch dimension
                         x_t = x[:, t:t + seq_length]
                         y_t = y[:, t:t + seq_length]
-                        y_pred = self.forward(x_t)
+                        y_pred, state = self.recurrent_forward(x_t, state=state)
+                        state = {k: v.detach() for k, v in state.items()}
 
                         # For compatibility with cross entropy, flatten the predictions and targets
                         y_pred = y_pred.view(-1, y_pred.size(-1)) # Flatten these into 2D w batch_size * seq_len, vocab_size

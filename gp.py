@@ -51,11 +51,10 @@ class Genome:
 
         if data_type < 0.4:
             int_type = random.randint(0, 1)
-            match int_type:
-                case 0:
-                    return random.choice(INT_VALS)  # Random multiple of input size
-                case 1:
-                    return random.randint(*SINT_RANGE)  # Random integer
+            if int_type == 0:
+                return random.choice(INT_VALS)  # Random multiple of input size
+            elif int_type == 1:
+                return random.randint(*SINT_RANGE)  # Random integer
         elif data_type < 0.8:
             return random.choice(self.valid_instructions)  # Add instruction. Project to list for random.choice to work
 
@@ -217,26 +216,25 @@ class Population:
         self.population.sort(key=lambda x: x.fitness[1], reverse=True) # Sort by accuracy currently
         print([genome.fitness[1] for genome in self.population]) # Should print accuracy
 
-        match method:
-            case 'tournament':
-                new_population = []
-                for _ in range(self.size):
-                    # Select a genome and make a deep copy
-                    genome = self.tournament(size)
-                    new_genome = copy.deepcopy(genome)
-                    new_population.append(new_genome)
-                # Update the population
-                self.population = new_population
-            case 'epsilon_lexicase':
-                new_population = []
-                for _ in range(self.size):
-                    # Select a genome and make a deep copy. We pass results and a random sample of the population
-                    #  genome.metrics = (loss, accuracy, network.flops, network.param_count)
-                    genome = self.epsilon_lexicase(self.population, test, metric_index=1, minimize=False)
-                    new_genome = copy.deepcopy(genome)
-                    new_population.append(new_genome)
-                # Update the population
-                self.population = new_population
+        if method == 'tournament':
+            new_population = []
+            for _ in range(self.size):
+                # Select a genome and make a deep copy
+                genome = self.tournament(size)
+                new_genome = copy.deepcopy(genome)
+                new_population.append(new_genome)
+            # Update the population
+            self.population = new_population
+        elif method == 'epsilon_lexicase':
+            new_population = []
+            for _ in range(self.size):
+                # Select a genome and make a deep copy. We pass results and a random sample of the population
+                #  genome.metrics = (loss, accuracy, network.flops, network.param_count)
+                genome = self.epsilon_lexicase(self.population, test, metric_index=1, minimize=False)
+                new_genome = copy.deepcopy(genome)
+                new_population.append(new_genome)
+            # Update the population
+            self.population = new_population
 
         self.save('pop.pkl')
 
